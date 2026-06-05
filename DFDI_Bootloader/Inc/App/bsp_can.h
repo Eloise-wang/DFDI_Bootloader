@@ -1,7 +1,8 @@
 /*!
  * @file bsp_can.h
  *
- * @brief BSP CAN interface for AC7840 - CAN0 (PE5/TX, PE6/RX, PE10/STB)
+ * @brief BSP CAN interface for AC7840 - CAN0 with FIFO support
+ *        Compatible with S32K142 CAN TP layer
  *
  */
 
@@ -14,6 +15,8 @@ extern "C" {
 
 /* ===========================================  Includes  =========================================== */
 #include "can_drv.h"
+#include "stdint.h"
+#include "stdbool.h"
 
 /* ============================================  Defines  ============================================ */
 #define BSP_CAN_INSTANCE        (0U)          /*!< CAN0 instance */
@@ -25,21 +28,44 @@ extern "C" {
 #define BSP_CAN_STB_GPIO        (GPIOE)
 #define BSP_CAN_STB_ACTIVE      (1U)          /* 1 = Normal mode, 0 = Standby */
 
+/* FIFO depths */
+#define BSP_CAN_RX_FIFO_SIZE    (16U)         /*!< RX FIFO size */
+#define BSP_CAN_TX_FIFO_SIZE    (16U)         /*!< TX FIFO size */
+
 /* ===========================================  Typedef  ============================================ */
-/* CAN TX/RX buffer for application layer */
+/* CAN message structure */
 typedef struct
 {
     uint32_t id;        /*!< CAN ID */
-    uint8_t  dlc;       /*!< Data length */
+    uint8_t  dlc;       /*!< Data length (0-8) */
     uint8_t  data[8];   /*!< Data */
 } bsp_can_msg_t;
+
+/* CAN TX message header for FIFO */
+typedef struct
+{
+    uint32_t txMsgID;           /*!< TX CAN ID */
+    uint32_t txMsgLength;       /*!< TX data length */
+    uint32_t txMsgCallBack;    /*!< TX callback function pointer */
+} bsp_can_tx_header_t;
+
+/* CAN RX message info for FIFO */
+typedef struct
+{
+    uint32_t rxDataId;         /*!< RX CAN ID */
+    uint8_t  rxDataLen;        /*!< RX data length */
+    uint8_t  aucDataBuf[8];    /*!< RX data buffer */
+} bsp_can_rx_info_t;
+
+/* CAN TX/RX buffer for application layer */
+typedef bsp_can_msg_t bsp_can_buf_t;
 
 /* CAN callback type */
 typedef void (*bsp_can_rx_callback_t)(const bsp_can_msg_t *msg);
 
-/* ====================================  Functions declaration  ===================================== */
+/* ===========================================  FIFO API  =========================================== */
 /*!
- * @brief Initialize BSP CAN peripheral
+ * @brief Initialize BSP CAN peripheral with FIFO support
  *
  * @return status_t - STATUS_SUCCESS if initialized successfully
  */
@@ -52,6 +78,52 @@ status_t BSP_CAN_Init(void);
  */
 status_t BSP_CAN_Deinit(void);
 
+/*!
+ * @brief CAN transmit task - call periodically to send messages from TX FIFO
+ *        This function should be called in main loop
+ *
+ * @return none
+ */
+void BSP_CAN_TxTask(void);
+
+/*!
+ * @brief Check if CAN TX is busy (transmitting)
+ *
+ * @return true if busy, false otherwise
+ */
+bool BSP_CAN_IsTxBusy(void);
+
+/*!
+ * @brief Abort current CAN TX transmission
+ *
+ * @return none
+ */
+void BSP_CAN_AbortTx(void);
+
+/*!
+ * @brief Read a message from RX FIFO
+ *
+ * @param[out] msg - Pointer to message structure to fill
+ * @return true if message was read, false if FIFO is empty
+ */
+bool BSP_CAN_ReadRxFifo(bsp_can_rx_info_t *msg);
+
+/*!
+ * @brief Get number of messages available in RX FIFO
+ *
+ * @return number of messages in RX FIFO
+ */
+uint16_t BSP_CAN_GetRxFifoCount(void);
+
+/*!
+ * @brief CAN STB pin control
+ *
+ * @param[in] active - 1 = Normal mode, 0 = Standby mode
+ * @return none
+ */
+void BSP_CAN_SetStbPin(uint8_t active);
+
+/* ===========================================  Legacy API (for compatibility)  =========================================== */
 /*!
  * @brief Send CAN message (non-blocking)
  *
@@ -74,27 +146,12 @@ status_t BSP_CAN_Transmit(uint32_t id, uint8_t dlc, const uint8_t *data);
 status_t BSP_CAN_TransmitBlocking(uint32_t id, uint8_t dlc, const uint8_t *data, uint32_t timeout_ms);
 
 /*!
- * @brief Install CAN receive callback
+ * @brief Install CAN receive callback (for legacy compatibility)
  *
  * @param[in] callback - Callback function pointer
  * @return none
  */
 void BSP_CAN_InstallRxCallback(bsp_can_rx_callback_t callback);
-
-/*!
- * @brief CAN STB pin control
- *
- * @param[in] active - 1 = Normal mode, 0 = Standby mode
- * @return none
- */
-void BSP_CAN_SetStbPin(uint8_t active);
-
-/*!
- * @brief Get CAN TX busy status
- *
- * @return true if TX is busy, false otherwise
- */
-bool BSP_CAN_IsTxBusy(void);
 
 #ifdef __cplusplus
 }
