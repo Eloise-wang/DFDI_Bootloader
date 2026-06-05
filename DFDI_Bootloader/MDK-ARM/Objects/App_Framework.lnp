@@ -7,6 +7,7 @@
 ".\objects\bsp_crc.o"
 ".\objects\bsp_aes.o"
 ".\objects\bsp_uds_algorithm.o"
+".\objects\bsp_uart.o"
 ".\objects\debugout_ac7840x.o"
 ".\objects\acmp_drv.o"
 ".\objects\acmp_hw.o"
