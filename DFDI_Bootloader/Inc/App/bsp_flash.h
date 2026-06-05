@@ -58,13 +58,18 @@
 #define FLASH_RESERVE_START     (APP_B_INFO_END_ADDR + 1UL)                            /* 0x00100800 */
 #define FLASH_RESERVE_END       (PFLASH_BASE_ADDR + PFLASH_SIZE - 1UL)                   /* 0x000FFFFF */
 
-/* APP类型枚举 - 与fls_app保持一致 */
+/* APP类型枚举 - 复用 user_config.h 中定义 */
+#ifndef APP_TYPE_ENUM_DEFINED
+#define APP_TYPE_ENUM_DEFINED
 typedef enum
 {
     APP_A_TYPE = 0,
+#ifdef EN_SUPPORT_APP_B
     APP_B_TYPE = 1,
+#endif
     APP_INVLID_TYPE = 0xFF
 } tAPPType;
+#endif
 
 /* Flash块信息结构体 */
 typedef struct
@@ -76,14 +81,14 @@ typedef struct
 /* Flash操作API结构体 - 与fls_app.h中tFlashOperateAPI对应 */
 typedef boolean (*tpfFlashInit)(void);
 typedef void (*tpfFlashDeInit)(void);
-typedef boolean (*tpfEraseSector)(const uint32_t, const uint32_t);
+typedef boolean (*tpfEraserSecotr)(const uint32_t, const uint32_t);
 typedef boolean (*tpfProgramData)(const uint32_t, const uint8_t *, const uint32_t);
 typedef boolean (*tpfReadFlashData)(const uint32_t, const uint32_t, uint8_t *);
 
 typedef struct
 {
     tpfFlashInit pfFlashInit;          /* Flash初始化 */
-    tpfEraseSector pfEraseSector;      /* 擦除扇区 */
+    tpfEraserSecotr pfEraserSecotr;    /* 擦除扇区 */
     tpfProgramData pfProgramData;      /* 编程数据 */
     tpfReadFlashData pfReadFlashData;  /* 读Flash数据 */
     tpfFlashDeInit pfFlashDeinit;      /* Flash反初始化 */
@@ -135,6 +140,18 @@ uint32_t BSP_Flash_LengthToSectors(uint32_t startAddr, uint32_t length);
 
 /* 读Flash数据 */
 boolean BSP_Flash_ReadData(uint32_t addr, uint32_t len, uint8_t *pDataBuf);
+
+/* 获取Flash驱动保留区信息 */
+boolean BSP_Flash_GetDriverInfo(uint32_t *pFlashDriverStartAddr, uint32_t *pFlashDriverEndAddr);
+
+/* 获取Reset Handler写入信息 */
+boolean BSP_Flash_GetResetHandlerInfo(boolean *pIsEnableWriteResetHandle, uint32_t *pResetHandleOffset, uint32_t *pResetHandleLength);
+
+/* 检查APP地址配置是否合法 */
+boolean BSP_Flash_APPAddrCheck(void);
+
+/* 写APP信息数据 */
+boolean BSP_Flash_WriteAPPInfoData(uint32_t addr, const uint8_t *pDataBuf, uint32_t len);
 
 /* 获取启动向量表偏移量 */
 uint32_t BSP_Flash_GetVectorTableOffset(void);

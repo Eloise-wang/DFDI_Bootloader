@@ -203,7 +203,7 @@ boolean BSP_Flash_RegisterAPI(tFlashOperateAPI *pstFlashOperateAPI)
 
     /* 注册API函数 */
     pstFlashOperateAPI->pfFlashInit = BSP_Flash_Hal_Init;
-    pstFlashOperateAPI->pfEraseSector = BSP_Flash_Hal_EraseSector;
+    pstFlashOperateAPI->pfEraserSecotr = BSP_Flash_Hal_EraseSector;
     pstFlashOperateAPI->pfProgramData = BSP_Flash_Hal_ProgramData;
     pstFlashOperateAPI->pfReadFlashData = BSP_Flash_Hal_ReadData;
     pstFlashOperateAPI->pfFlashDeinit = BSP_Flash_Hal_Deinit;
@@ -261,10 +261,12 @@ boolean BSP_Flash_GetAPPInfo(tAPPType appType, uint32_t *pAppInfoStartAddr, uint
             *pAppInfoStartAddr = APP_A_INFO_ADDR;
             *pBlockSize = APP_INFO_SIZE;
             break;
+#ifdef EN_SUPPORT_APP_B
         case APP_B_TYPE:
             *pAppInfoStartAddr = APP_B_INFO_ADDR;
             *pBlockSize = APP_INFO_SIZE;
             break;
+#endif
         default:
             return FALSE;
     }
@@ -302,9 +304,11 @@ uint32_t BSP_Flash_GetTotalSectors(tAPPType appType)
         case APP_A_TYPE:
             totalSize = APP_SIZE + APP_INFO_SIZE;
             break;
+#ifdef EN_SUPPORT_APP_B
         case APP_B_TYPE:
             totalSize = APP_SIZE + APP_INFO_SIZE;
             break;
+#endif
         default:
             return 0;
     }
@@ -336,9 +340,11 @@ boolean BSP_Flash_SectorNumberToAddress(tAPPType appType, uint32_t sectorNo, uin
         case APP_A_TYPE:
             *pFlashAddr = APP_A_START_ADDR + sectorNo * PFLASH_PAGE_SIZE;
             break;
+#ifdef EN_SUPPORT_APP_B
         case APP_B_TYPE:
             *pFlashAddr = APP_B_START_ADDR + sectorNo * PFLASH_PAGE_SIZE;
             break;
+#endif
         default:
             return FALSE;
     }
@@ -378,6 +384,92 @@ uint32_t BSP_Flash_LengthToSectors(uint32_t startAddr, uint32_t length)
 boolean BSP_Flash_ReadData(uint32_t addr, uint32_t len, uint8_t *pDataBuf)
 {
     return BSP_Flash_Hal_ReadData(addr, len, pDataBuf);
+}
+
+/*
+ * @brief 获取Flash驱动保留区信息
+ */
+boolean BSP_Flash_GetDriverInfo(uint32_t *pFlashDriverStartAddr, uint32_t *pFlashDriverEndAddr)
+{
+    if ((NULL_PTR == pFlashDriverStartAddr) || (NULL_PTR == pFlashDriverEndAddr))
+    {
+        return FALSE;
+    }
+
+    *pFlashDriverStartAddr = FLASH_RESERVE_START;
+    *pFlashDriverEndAddr = FLASH_RESERVE_END;
+    return TRUE;
+}
+
+/*
+ * @brief 获取Reset Handler写入信息
+ */
+boolean BSP_Flash_GetResetHandlerInfo(boolean *pIsEnableWriteResetHandle, uint32_t *pResetHandleOffset, uint32_t *pResetHandleLength)
+{
+    if ((NULL_PTR == pIsEnableWriteResetHandle) || (NULL_PTR == pResetHandleOffset) || (NULL_PTR == pResetHandleLength))
+    {
+        return FALSE;
+    }
+
+    *pIsEnableWriteResetHandle = TRUE;
+    *pResetHandleOffset = 4u;
+    *pResetHandleLength = 4u;
+    return TRUE;
+}
+
+/*
+ * @brief 检查APP地址配置是否合法
+ */
+boolean BSP_Flash_APPAddrCheck(void)
+{
+    if ((APP_A_START_ADDR < PFLASH_BASE_ADDR) || (APP_A_END_ADDR > (PFLASH_BASE_ADDR + PFLASH_SIZE - 1u)))
+    {
+        return FALSE;
+    }
+
+#ifdef EN_SUPPORT_APP_B
+    if ((APP_B_START_ADDR < PFLASH_BASE_ADDR) || (APP_B_END_ADDR > (PFLASH_BASE_ADDR + PFLASH_SIZE - 1u)))
+    {
+        return FALSE;
+    }
+#endif
+
+    return TRUE;
+}
+
+/*
+ * @brief 写APP信息数据
+ */
+boolean BSP_Flash_WriteAPPInfoData(uint32_t addr, const uint8_t *pDataBuf, uint32_t len)
+{
+    tFlashOperateAPI flashApi;
+
+    if ((NULL_PTR == pDataBuf) || (0u == len))
+    {
+        return FALSE;
+    }
+
+    if (TRUE != BSP_Flash_RegisterAPI(&flashApi))
+    {
+        return FALSE;
+    }
+
+    if ((NULL_PTR == flashApi.pfFlashInit) || (NULL_PTR == flashApi.pfEraserSecotr) || (NULL_PTR == flashApi.pfProgramData))
+    {
+        return FALSE;
+    }
+
+    if (TRUE != flashApi.pfFlashInit())
+    {
+        return FALSE;
+    }
+
+    if (TRUE != flashApi.pfEraserSecotr(addr, BSP_Flash_LengthToSectors(addr, len)))
+    {
+        return FALSE;
+    }
+
+    return flashApi.pfProgramData(addr, pDataBuf, len);
 }
 
 /*
