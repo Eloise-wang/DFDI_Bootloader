@@ -56,11 +56,23 @@ dkms.conf
 
 # Keil MDK 用户配置文件
 *.uvguix.*
+*.uvoptx
+*.uvprojx
+*.uvopt
+*.uvgui
+
+# Keil MDK 编译输出文件
+*.axf
+*.lst
+*.crf
+*.htm
+*.dep
+*.bak
+
 # Keil MDK 编译输出目录
 MDK-ARM/Listings/
 MDK-ARM/Objects/
+RTE/
 
-*.crf
+# 输出文件
 *.bin
-*.htm
-*.dep
