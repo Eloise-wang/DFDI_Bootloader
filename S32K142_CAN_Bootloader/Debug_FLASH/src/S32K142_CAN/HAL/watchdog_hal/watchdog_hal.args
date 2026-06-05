@@ -1,0 +1,61 @@
+-std=c99
+-DCPU_S32K142
+-I../SDK/platform/drivers/inc
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/S32K142_CAN/Debug"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/S32K142_CAN/HAL/crc_hal"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/S32K142_CAN/HAL/timer_hal"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/S32K142_CAN/HAL/flash_hal"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/S32K142_CAN/HAL/UDS_algorithm_hal"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/S32K142_CAN/HAL/watchdog_hal"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/S32K142_CAN/boot"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/S32K142_CAN/public_inc"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/unified_stack/auto_lib"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/unified_stack/Demo"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/unified_stack/FIFO"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/unified_stack/Flash_app"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/unified_stack/UDS_stack/TP/CAN_TP"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/unified_stack/UDS_stack/TP"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/unified_stack/UDS_stack/TP/LIN_TP"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/unified_stack/UDS_stack/UDS"
+-I../SDK/rtos/osif
+-I../SDK/platform/drivers/src/lpuart
+-I../SDK/platform/pal/inc
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/src/driver/flash"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/board"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/SDK/platform/devices/common"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/SDK/platform/devices"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/SDK/platform/devices/S32K142/include"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/SDK/platform/drivers/inc"
+-I"D:/Git_workplace/S32K142_CAN_UDS_BOOTLOADER/S32K142_CAN_Bootloader/SDK/platform/drivers/src/clock/S32K1xx"
+-I"D:/APP_Software/NXP/S32 DS_3.4/S32DS/software/S32SDK_S32K1XX_RTM_4.0.3/platform"
+-I"D:/APP_Software/NXP/S32 DS_3.4/S32DS/software/S32SDK_S32K1XX_RTM_4.0.3/platform/devices"
+-I"D:/APP_Software/NXP/S32 DS_3.4/S32DS/software/S32SDK_S32K1XX_RTM_4.0.3/platform/devices/common"
+-I"D:/APP_Software/NXP/S32 DS_3.4/S32DS/software/S32SDK_S32K1XX_RTM_4.0.3/platform/devices/S32K142/include"
+-I"D:/APP_Software/NXP/S32 DS_3.4/S32DS/software/S32SDK_S32K1XX_RTM_4.0.3/platform/devices/S32K142/startup"
+-I"D:/APP_Software/NXP/S32 DS_3.4/S32DS/software/S32SDK_S32K1XX_RTM_4.0.3/platform/drivers/inc"
+-I"D:/APP_Software/NXP/S32 DS_3.4/S32DS/software/S32SDK_S32K1XX_RTM_4.0.3/platform/pal/inc"
+-I"D:/APP_Software/NXP/S32 DS_3.4/S32DS/software/S32SDK_S32K1XX_RTM_4.0.3/rtos/osif"
+-O1
+-fshort-enums
+-fno-jump-tables
+-funsigned-char
+-g
+-pedantic
+-Wall
+-Wextra
+-c
+-fmessage-length=0
+-funsigned-bitfields
+-ffunction-sections
+-fdata-sections
+-fno-common
+-Wunused
+-Wstrict-prototypes
+-Wsign-compare
+-mcpu=cortex-m4
+-mthumb
+-mfloat-abi=hard
+-mfpu=fpv4-sp-d16
+-specs=nano.specs
+-specs=nosys.specs
+--sysroot="D:/APP_Software/NXP/S32 DS_3.4/S32DS/build_tools/gcc_v6.3/gcc-6.3-arm32-eabi/arm-none-eabi/newlib"
