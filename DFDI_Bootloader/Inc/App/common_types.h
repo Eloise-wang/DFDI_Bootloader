@@ -72,6 +72,21 @@
         #define htonl(a) ntohl(a)
     #endif
 
+    #ifndef ntohll
+        #define ntohll(a) (((((uint64_t)(a)) & 0xFF00000000000000ULL) >> 56U) | \
+                          ((((uint64_t)(a)) & 0x00FF000000000000ULL) >> 40U) | \
+                          ((((uint64_t)(a)) & 0x0000FF0000000000ULL) >> 24U) | \
+                          ((((uint64_t)(a)) & 0x000000FF00000000ULL) >> 8U)  | \
+                          ((((uint64_t)(a)) & 0x00000000FF000000ULL) << 8U)  | \
+                          ((((uint64_t)(a)) & 0x0000000000FF0000ULL) << 24U) | \
+                          ((((uint64_t)(a)) & 0x000000000000FF00ULL) << 40U) | \
+                          ((((uint64_t)(a)) & 0x00000000000000FFULL) << 56U))
+    #endif
+
+    #ifndef htonll
+        #define htonll(a) ntohll(a)
+    #endif
+
 #elif (BIG == MACHINE_ENDIAN)
     #ifndef ntohs
         #define ntohs(a) (a)

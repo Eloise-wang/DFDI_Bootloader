@@ -1,5 +1,4 @@
 --cpu=Cortex-M4.fp
-".\objects\main.o"
 ".\objects\bsp_can.o"
 ".\objects\bsp_crc.o"
 ".\objects\bsp_timer.o"
@@ -16,6 +15,7 @@
 ".\objects\boot.o"
 ".\objects\boot_cfg.o"
 ".\objects\app_demo.o"
+".\objects\main.o"
 ".\objects\debugout_ac7840x.o"
 ".\objects\acmp_drv.o"
 ".\objects\acmp_hw.o"

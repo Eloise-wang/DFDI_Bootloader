@@ -8,7 +8,7 @@
  *       Note : 1. 适配芯片：AC78406
  *              2. 编码格式：UTF-8
  *              3. 编译环境：MDK-ARM / GCC
- *              4. CRC算法: CRC-16/DNP (Poly=0x3D65, RefIn=true, RefOut=true, XorOut=0xFFFF)
+ *              4. CRC算法: CRC-32 (与S32K142保持一致)
  */
 
 #ifndef BSP_CRC_H_
@@ -19,7 +19,7 @@
 /* ============================================  Defines  ============================================ */
 
 /* CRC初始值 - 与S32K142一致 */
-#define BSP_CRC_SEED_INIT_VALUE 0xFFFFU
+#define BSP_CRC_SEED_INIT_VALUE 0xFFFFFFFFU
 
 /* ============================================  API  ============================================ */
 
@@ -35,9 +35,9 @@ extern bool BSP_CRC_Init(void);
  * @param[in] dataLen 数据长度
  * @param[out] pCrc CRC结果指针
  * @return TRUE-成功, FALSE-失败
- * @note 该函数使用软件CRC-16/DNP查表法
+ * @note 该函数使用软件CRC-32查表法
  */
-extern bool BSP_CRC_Calculate(const uint8_t *pDataBuf, uint32_t dataLen, uint16_t *pCrc);
+extern bool BSP_CRC_Calculate(const uint8_t *pDataBuf, uint32_t dataLen, uint32_t *pCrc);
 
 /*!
  * @brief 一次计算完成CRC
@@ -47,14 +47,14 @@ extern bool BSP_CRC_Calculate(const uint8_t *pDataBuf, uint32_t dataLen, uint16_
  * @return TRUE-成功, FALSE-失败
  * @note 初始化、计算、结束操作一次性完成
  */
-extern bool BSP_CRC_CalculateOnce(const uint8_t *pDataBuf, uint32_t dataLen, uint16_t *pCrc);
+extern bool BSP_CRC_CalculateOnce(const uint8_t *pDataBuf, uint32_t dataLen, uint32_t *pCrc);
 
 /*!
  * @brief 开始CRC计算（初始化种子）
  * @param[out] pCrc CRC变量指针
  * @return TRUE-成功, FALSE-失败
  */
-extern bool BSP_CRC_Start(uint16_t *pCrc);
+extern bool BSP_CRC_Start(uint32_t *pCrc);
 
 /*!
  * @brief 追加CRC计算数据
@@ -63,14 +63,14 @@ extern bool BSP_CRC_Start(uint16_t *pCrc);
  * @param[out] pCrc CRC变量指针
  * @return TRUE-成功, FALSE-失败
  */
-extern bool BSP_CRC_Append(const uint8_t *pDataBuf, uint32_t dataLen, uint16_t *pCrc);
+extern bool BSP_CRC_Append(const uint8_t *pDataBuf, uint32_t dataLen, uint32_t *pCrc);
 
 /*!
  * @brief 结束CRC计算（取反）
  * @param[out] pCrc CRC变量指针
  * @return TRUE-成功, FALSE-失败
  */
-extern bool BSP_CRC_End(uint16_t *pCrc);
+extern bool BSP_CRC_End(uint32_t *pCrc);
 
 /*!
  * @brief 去初始化CRC模块

@@ -74,11 +74,11 @@ typedef struct
      /*received data length*/
      uint32 receivedDataLength;
  
-     /*received CRC value*/
-     uint16 receivedCRC;
- 
-     /*calculate CRC value*/
-     uint16 calculateCRCValue;
+    /*received CRC value*/
+    uint32 receivedCRC;
+
+    /*calculate CRC value*/
+    uint32 calculateCRCValue;
  
      /*received program data length*/
      uint32 receiveProgramDataLength;
@@ -247,7 +247,7 @@ do{\
  static boolean Flash_IsReceivedCRCValid(void);
  
  /*save calcualte CRC value*/
- static void Flash_SaveCalculateCRCValue(const uint16 i_CRCValue);
+ static void Flash_SaveCalculateCRCValue(const uint32 i_CRCValue);
  
  /* Fash Erase*/
  static uint8 Flash_Erase(boolean * o_pbIsOperateFinsh);
@@ -534,9 +534,9 @@ do{\
  static uint8 Flash_Erase(boolean * o_pbIsOperateFinsh)
  {
      static uint8 s_result = TRUE;
-     uint32 eraseFlashLen = 0u;
-     uint16 xCountCrc = 0u;
-     static tAPPType s_appType = APP_INVLID_TYPE;
+    uint32 eraseFlashLen = 0u;
+    uint32 xCountCrc = 0u;
+    static tAPPType s_appType = APP_INVLID_TYPE;
      static BlockInfo_t * s_pAppFlashMemoryInfo = NULL_PTR;
      static uint32 s_appFlashItem = 0u;
      uint32 sectorNo = 0u;
@@ -819,9 +819,9 @@ do{\
  /*flash write */
  static uint8 Flash_Write(boolean * o_pbIsOperateFinsh)
  {
-     uint8 result = FALSE;
-     uint16 countCrc = 0u;
-     uint8 flashDataIndex = 0u;
+    uint8 result = FALSE;
+    uint32 countCrc = 0u;
+    uint8 flashDataIndex = 0u;
      uint8 fillCnt = 0u;
  
      /*check flash driver valid or not?*/
@@ -1043,7 +1043,7 @@ do{\
  {
      tChecksumStep checksumStep = START_CHECKSUM;
      uint8 isSuccessful = FALSE;
-     static uint16 s_xCountCrc = 0u;
+     static uint32 s_xCountCrc = 0u;
      boolean isOperateFinsh = FALSE;
      static uint32 s_calCRCDataLen = 0u;
      uint32 startCalDataAddr = 0u;
@@ -1132,11 +1132,11 @@ do{\
      return isSuccessful;	
  }
  
- /*save received check sum crc*/
- void Flash_SavedReceivedCheckSumCrc(uint32 i_receivedCrc)
- {
-     gs_stFlashDownloadInfo.receivedCRC = (uint16)i_receivedCrc;
- }
+/*save received check sum crc*/
+void Flash_SavedReceivedCheckSumCrc(uint32 i_receivedCrc)
+{
+    gs_stFlashDownloadInfo.receivedCRC = i_receivedCrc;
+}
  
  /*Is received CRC valid?*/
  static boolean Flash_IsReceivedCRCValid(void)
@@ -1156,7 +1156,7 @@ do{\
  }
  
  /*save calcualte CRC value*/
-static void Flash_SaveCalculateCRCValue(const uint16 i_CRCValue)
+static void Flash_SaveCalculateCRCValue(const uint32 i_CRCValue)
 {
     gs_stFlashDownloadInfo.calculateCRCValue = i_CRCValue;
 }
@@ -1275,9 +1275,9 @@ static void Flash_SaveCalculateCRCValue(const uint16 i_CRCValue)
  }
  
  /*Is read application inforemation from flash valid?*/
- uint8 Flash_IsReadAppInfoFromFlashValid(void)
- {
-     uint16 xCrc = 0u;
+uint8 Flash_IsReadAppInfoFromFlashValid(void)
+{
+    uint32 xCrc = 0u;
  
      /*read application information from flash*/
      Flash_ReadNewestAppInfoFromFlash();
@@ -1320,10 +1320,10 @@ static void Flash_SaveCalculateCRCValue(const uint16 i_CRCValue)
  void Flash_SavePrintfigner(const uint8 *i_pPrintfigner, const uint8 i_printfinerLen)
  {
  
-     uint8 printfignerLen = 0u;
-     uint16 crc = 0u;
-     
-     ASSERT(NULL_PTR == i_pPrintfigner);
+    uint8 printfignerLen = 0u;
+    uint32 crc = 0u;
+    
+    ASSERT(NULL_PTR == i_pPrintfigner);
  
      if(i_printfinerLen > FL_FINGER_PRINT_LENGTH)
      {
@@ -1344,10 +1344,10 @@ static void Flash_SaveCalculateCRCValue(const uint16 i_CRCValue)
  {
      uint8 result = FALSE;
      tAPPType oldAppType = APP_A_TYPE;
-     uint32 appInfoStartAddr = 0u;
-     uint32 appInfoLen = 0u;
-     uint16 crc = 0u;
-     tAppFlashStatus *pAppStatusPtr = NULL_PTR;
+    uint32 appInfoStartAddr = 0u;
+    uint32 appInfoLen = 0u;
+    uint32 crc = 0u;
+    tAppFlashStatus *pAppStatusPtr = NULL_PTR;
  
      tAPPType newestAPPType = APP_A_TYPE;
      uint32 newestAPPInfoStartAddr = 0u;
@@ -1490,9 +1490,9 @@ static void Flash_SaveCalculateCRCValue(const uint16 i_CRCValue)
  /*Do check newest app information*/
  static tAPPType Flash_DoCheckNewestAPPInfo(const tAppFlashStatus * i_pAppAInfo, const tAppFlashStatus *i_pAppBInfo)
  {
- #ifdef EN_SUPPORT_APP_B
-     uint16 crc = 0u;
-     boolean bIsAppAValid = FALSE;
+#ifdef EN_SUPPORT_APP_B
+    uint32 crc = 0u;
+    boolean bIsAppAValid = FALSE;
      boolean bIsAppBValid = FALSE;
      tAPPType newestAPP = APP_A_TYPE;
  #endif /*#ifndef EN_SUPPORT_APP_B*/

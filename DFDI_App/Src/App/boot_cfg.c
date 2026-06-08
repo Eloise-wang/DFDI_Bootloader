@@ -50,12 +50,12 @@ static const tBootInfo gs_stBootInfo = {
 static boolean Boot_IsInfoValid(void);
 
 /*calculate information CRC*/
-static uint16 Boot_CalculateInfoCRC(void);
+static uint32 Boot_CalculateInfoCRC(void);
 
 /*set download app successful */
 void SetDownloadAppSuccessful(void)
 {
-	uint16 infoCrc = 0u;
+	uint32 infoCrc = 0u;
 
 	*((uint8 *)gs_stBootInfo.downloadAppSuccessfulAddr) = gs_stBootInfo.downloadAPPSuccessful;
 
@@ -66,7 +66,7 @@ void SetDownloadAppSuccessful(void)
 /*Is request enter bootloader?*/
 void Boot_RequestEnterBootloader(void)
 {
-	uint16 infoCrc = 0u;
+	uint32 infoCrc = 0u;
 
 	*((uint8 *)gs_stBootInfo.requestEnterBootloaderAddr) = gs_stBootInfo.requestEnterBootloader;
 
@@ -93,7 +93,7 @@ boolean Boot_IsDownloadAPPSccessful(void)
 /*clear download APP successful flag*/
 void ClearDownloadAPPSuccessfulFlag(void)
 {
-	uint16 infoCrc = 0u;
+	uint32 infoCrc = 0u;
 
 	*((uint8 *)gs_stBootInfo.downloadAppSuccessfulAddr) = 0u;
 
@@ -104,7 +104,7 @@ void ClearDownloadAPPSuccessfulFlag(void)
 /*Is information valid?*/
 static boolean Boot_IsInfoValid(void)
 {
-	uint16 infoCrc = 0u;
+	uint32 infoCrc = 0u;
 	uint16 storageCrc = 0u;
 	boolean result = FALSE;
 
@@ -112,7 +112,7 @@ static boolean Boot_IsInfoValid(void)
 
 	storageCrc = GetInfoStorageCRC();
 
-	if(storageCrc == infoCrc)
+	if((uint16)infoCrc == storageCrc)
 	{
 		result = TRUE;
 	}
@@ -121,9 +121,9 @@ static boolean Boot_IsInfoValid(void)
 }
 
 /*calculate information CRC*/
-static uint16 Boot_CalculateInfoCRC(void)
+static uint32 Boot_CalculateInfoCRC(void)
 {
-	uint16 infoCrc = 0u;
+	uint32 infoCrc = 0u;
 
 	BSP_CRC_CalculateOnce((const uint8 *)gs_stBootInfo.infoStartAddr, gs_stBootInfo.infoDataLen - 2u, &infoCrc);
 

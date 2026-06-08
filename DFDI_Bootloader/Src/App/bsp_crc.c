@@ -8,7 +8,7 @@
  *       Note : 1. 适配芯片：AC78406
  *              2. 编码格式：UTF-8
  *              3. 编译环境：MDK-ARM / GCC
- *              4. CRC算法: CRC-16/DNP (Poly=0x3D65, RefIn=true, RefOut=true, XorOut=0xFFFF)
+ *              4. CRC算法: CRC-32 (与S32K142保持一致)
  */
 
 #include "bsp_crc.h"
@@ -22,42 +22,42 @@ static bool g_bCrcInit = false;
 static crc_user_config_t g_crcConfig;
 
 /*!< 当前CRC实例的CRC值 */
-static uint16_t g_curCrc = 0U;
+static uint32_t g_curCrc = 0U;
 
 /* ============================================  内部函数  ============================================ */
 
 /*!
- * @brief 配置CRC为CRC-16/DNP模式
+ * @brief 配置CRC为CRC-32模式
  *
  * @return none
  */
-static void CRC_ConfigureDnp(void)
+static void CRC_Configure32(void)
 {
     /* 获取默认配置 */
     CRC_DRV_GetDefaultConfig(&g_crcConfig);
 
-    /* CRC-16/DNP配置:
-     * Poly: 0x3D65
-     * Seed: 0xFFFF
-     * RefIn: true (字节和位反转)
-     * RefOut: true
-     * XorOut: 0xFFFF
+    /* CRC-32配置:
+     * Poly: 0x04C11DB7 (标准CRC-32)
+     * Seed: 0xFFFFFFFF
+     * RefIn: false
+     * RefOut: false
+     * XorOut: 0xFFFFFFFF
      */
-    g_crcConfig.crcProtocolType = CRC_PROTOCOL_16BIT;
-    g_crcConfig.poly = 0x3D65U;                      /* CRC-16/DNP 多项式 */
-    g_crcConfig.seed = BSP_CRC_SEED_INIT_VALUE;      /* 初始值 */
-    g_crcConfig.writeTransposeType = CRC_TRANSPOSE_BITS_BYTES;  /* 写数据时位和字节都反转 */
-    g_crcConfig.readTransposeType = CRC_TRANSPOSE_BITS_BYTES;  /* 读结果时位和字节都反转 */
-    g_crcConfig.finalXOR = true;                      /* 结果异或0xFFFF */
-    g_crcConfig.writeBytesNumOnce = CRC_WRITE_1_BYTE_ONCE;
+    g_crcConfig.crcProtocolType = CRC_PROTOCOL_32BIT;
+    g_crcConfig.poly = 0x04C11DB7U;              /* CRC-32 多项式 */
+    g_crcConfig.seed = BSP_CRC_SEED_INIT_VALUE;      /* 初始值 0xFFFFFFFF */
+    g_crcConfig.writeTransposeType = CRC_TRANSPOSE_NONE;
+    g_crcConfig.readTransposeType = CRC_TRANSPOSE_NONE;
+    g_crcConfig.finalXOR = true;                      /* 结果异或0xFFFFFFFF */
+    g_crcConfig.writeBytesNumOnce = CRC_WRITE_4_BYTE_ONCE;
 }
 
 /* ============================================  API实现  ============================================ */
 
 bool BSP_CRC_Init(void)
 {
-    /* 配置CRC为DNP模式 */
-    CRC_ConfigureDnp();
+    /* 配置CRC为32模式 */
+    CRC_Configure32();
 
     /* 初始化CRC硬件 */
     status_t status = CRC_DRV_Init(CRC_INST, &g_crcConfig);
@@ -71,7 +71,7 @@ bool BSP_CRC_Init(void)
     return false;
 }
 
-bool BSP_CRC_Calculate(const uint8_t *pDataBuf, uint32_t dataLen, uint16_t *pCrc)
+bool BSP_CRC_Calculate(const uint8_t *pDataBuf, uint32_t dataLen, uint32_t *pCrc)
 {
     if (!g_bCrcInit || (NULL == pDataBuf) || (NULL == pCrc))
     {
@@ -81,14 +81,13 @@ bool BSP_CRC_Calculate(const uint8_t *pDataBuf, uint32_t dataLen, uint16_t *pCrc
     /* 写入数据计算CRC */
     CRC_DRV_WriteData(CRC_INST, pDataBuf, dataLen);
 
-    /* 获取CRC结果（低16位） */
-    uint32_t result = CRC_DRV_GetCrcResult(CRC_INST);
-    *pCrc = (uint16_t)(result & 0xFFFFU);
+    /* 获取CRC结果 */
+    *pCrc = CRC_DRV_GetCrcResult(CRC_INST);
 
     return true;
 }
 
-bool BSP_CRC_CalculateOnce(const uint8_t *pDataBuf, uint32_t dataLen, uint16_t *pCrc)
+bool BSP_CRC_CalculateOnce(const uint8_t *pDataBuf, uint32_t dataLen, uint32_t *pCrc)
 {
     if (!BSP_CRC_Start(pCrc))
     {
@@ -108,7 +107,7 @@ bool BSP_CRC_CalculateOnce(const uint8_t *pDataBuf, uint32_t dataLen, uint16_t *
     return true;
 }
 
-bool BSP_CRC_Start(uint16_t *pCrc)
+bool BSP_CRC_Start(uint32_t *pCrc)
 {
     if (!g_bCrcInit || (NULL == pCrc))
     {
@@ -116,7 +115,7 @@ bool BSP_CRC_Start(uint16_t *pCrc)
     }
 
     /* 重新初始化CRC（设置种子） */
-    CRC_ConfigureDnp();
+    CRC_Configure32();
     CRC_DRV_Init(CRC_INST, &g_crcConfig);
 
     g_curCrc = BSP_CRC_SEED_INIT_VALUE;
@@ -125,7 +124,7 @@ bool BSP_CRC_Start(uint16_t *pCrc)
     return true;
 }
 
-bool BSP_CRC_Append(const uint8_t *pDataBuf, uint32_t dataLen, uint16_t *pCrc)
+bool BSP_CRC_Append(const uint8_t *pDataBuf, uint32_t dataLen, uint32_t *pCrc)
 {
     if (!g_bCrcInit || (NULL == pDataBuf) || (NULL == pCrc))
     {
@@ -136,21 +135,20 @@ bool BSP_CRC_Append(const uint8_t *pDataBuf, uint32_t dataLen, uint16_t *pCrc)
     CRC_DRV_WriteData(CRC_INST, pDataBuf, dataLen);
 
     /* 更新当前CRC值 */
-    uint32_t result = CRC_DRV_GetCrcResult(CRC_INST);
-    g_curCrc = (uint16_t)(result & 0xFFFFU);
+    g_curCrc = CRC_DRV_GetCrcResult(CRC_INST);
     *pCrc = g_curCrc;
 
     return true;
 }
 
-bool BSP_CRC_End(uint16_t *pCrc)
+bool BSP_CRC_End(uint32_t *pCrc)
 {
     if (!g_bCrcInit || (NULL == pCrc))
     {
         return false;
     }
 
-    /* CRC-16/DNP 需要对结果取反（在配置中已设置finalXOR=true） */
+    /* CRC-32 最终异或已在硬件配置中完成 */
     *pCrc = g_curCrc;
 
     return true;
