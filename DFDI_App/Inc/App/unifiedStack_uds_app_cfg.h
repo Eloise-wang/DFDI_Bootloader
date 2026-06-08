@@ -74,12 +74,32 @@
  #define PROGRAM_SESSION (1u << 1u)       /*program session*/
  #define EXTEND_SESSION (1u << 2u)        /*extend session*/
  
- /*security request*/
- #define NONE_SECURITY (1u << 0u)                          /*none security can request*/
- #define SECURITY_LEVEL_1 ((1 << 1u) | NONE_SECURITY)      /*security level 1 request*/
- #define SECURITY_LEVEL_2 ((1u << 2u) | SECURITY_LEVEL_1)  /*security level 2 request*/
- 
- /*********************************************************/
+/*security request*/
+#define NONE_SECURITY (1u << 0u)                          /*none security can request*/
+#define SECURITY_LEVEL_1 ((1 << 1u) | NONE_SECURITY)      /*security level 1 request*/
+#define SECURITY_LEVEL_2 ((1u << 2u) | SECURITY_LEVEL_1)  /*security level 2 request*/
+
+/*support function/physical ID request*/
+#define ERRO_REQUEST_ID (0u)             /*received ID failled*/
+#define SUPPORT_PHYSICAL_ADDR (1u << 0u) /*support physical ID request */
+#define SUPPORT_FUNCTION_ADDR (1u << 1u)  /*support function ID request*/
+
+/*check routine control info*/
+typedef enum
+{
+    GET_VERSION,                        /*get version*/
+} tCheckRoutineCtlInfo;
+
+/* UDS time control information config table */
+typedef struct
+{
+    uint8 CalledPeriod;         /*called uds period*/
+    uint8 SecurityRequestCnt;
+    tUdsTime xLockTime;         /*lock time*/
+    tUdsTime xS3Server;         /*s3 server time. */
+} tUdsTimeInfo;
+
+/*********************************************************/
  /*set currrent session mode. DEFAULT_SESSION/PROGRAM_SESSION/EXTEND_SESSION */
  extern void UDS_SetCurrentSession(const uint8 i_setSessionMode);
  
