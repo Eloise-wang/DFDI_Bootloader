@@ -20,8 +20,6 @@
 ".\objects\unifiedstack_tp.o"
 ".\objects\unifiedstack_tp_cfg.o"
 ".\objects\unifiedstack_uds_app_cfg.o"
-".\objects\bootloader_debug.o"
-".\objects\debug_io.o"
 ".\objects\debugout_ac7840x.o"
 ".\objects\acmp_drv.o"
 ".\objects\acmp_hw.o"
