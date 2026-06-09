@@ -27,9 +27,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// D:/APP_Software/EcuBus-Pro/resources/app.asar.unpacked/resources/lib/js/index.js
+// ../../../../APP_Software/EcuBus-Pro/resources/app.asar.unpacked/resources/lib/js/index.js
 var require_js = __commonJS({
-  "D:/APP_Software/EcuBus-Pro/resources/app.asar.unpacked/resources/lib/js/index.js"(exports2) {
+  "../../../../APP_Software/EcuBus-Pro/resources/app.asar.unpacked/resources/lib/js/index.js"(exports2) {
     init_init();
     (() => {
       var e = { 775(e2, t2) {
@@ -8045,10 +8045,10 @@ var require_js = __commonJS({
   }
 });
 
-// D:/APP_Software/EcuBus-Pro/resources/app.asar.unpacked/resources/lib/js/init.js
+// ../../../../APP_Software/EcuBus-Pro/resources/app.asar.unpacked/resources/lib/js/init.js
 var import_ECB;
 var init_init = __esm({
-  "D:/APP_Software/EcuBus-Pro/resources/app.asar.unpacked/resources/lib/js/init.js"() {
+  "../../../../APP_Software/EcuBus-Pro/resources/app.asar.unpacked/resources/lib/js/init.js"() {
     import_ECB = __toESM(require_js());
   }
 });
@@ -8064,12 +8064,8 @@ var maxChunkSize = void 0;
 var content = void 0;
 var fileList = [
   {
-    addr: 536868608,
-    file: import_path.default.join(process.env.PROJECT_ROOT, "bin", "S32K142_flash_driver.bin")
-  },
-  {
-    addr: 61952,
-    file: import_path.default.join(process.env.PROJECT_ROOT, "bin", "S32K142_CAN_APP.bin")
+    addr: 65536,
+    file: import_path.default.join(process.env.PROJECT_ROOT, "bin", "DFDI_APP.bin")
   }
 ];
 Util.Init(async () => {

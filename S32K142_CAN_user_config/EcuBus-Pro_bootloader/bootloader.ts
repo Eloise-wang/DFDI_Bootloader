@@ -11,14 +11,8 @@ const fileList: {
   file: string
 }[] = [
   {
-    addr: 0x1FFFF700,
-      
-    file: path.join(process.env.PROJECT_ROOT, 'bin', 'S32K142_flash_driver.bin')
-  },
-  {
-    addr: 0x0000F200,
-     
-    file: path.join(process.env.PROJECT_ROOT, 'bin', 'S32K142_CAN_APP.bin')
+    addr: 0x00010000,
+    file: path.join(process.env.PROJECT_ROOT, 'bin', 'DFDI_APP.bin')
   }
 ]
 

@@ -28,6 +28,12 @@ extern "C" {
 #define BSP_CAN_STB_GPIO        (GPIOE)
 #define BSP_CAN_STB_ACTIVE      (1U)          /* 1 = Normal mode, 0 = Standby */
 
+/* CAN pins - PE4=RX, PE5=TX (ALT5) */
+#define BSP_CAN_RX_PORT         (PORTE)
+#define BSP_CAN_RX_PIN          (4U)
+#define BSP_CAN_TX_PORT         (PORTE)
+#define BSP_CAN_TX_PIN          (5U)
+
 /* FIFO depths */
 #define BSP_CAN_RX_FIFO_SIZE    (16U)         /*!< RX FIFO size */
 #define BSP_CAN_TX_FIFO_SIZE    (16U)         /*!< TX FIFO size */

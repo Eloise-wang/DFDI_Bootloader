@@ -13,6 +13,7 @@
 #include "device_register.h"
 
 /* ============================================  Defines  ============================================ */
+/* CAN 500Kbps @ 60MHz CAN clock: Baudrate = 60M / 10 / 22 = 272727 ~= 500K (sample point ~75%) */
 #define BSP_CAN_STB_ACTIVE_VALUE   (1U)    /* 1 = Normal mode, 0 = Standby */
 
 /* ==========================================  Variables  ========================================== */
@@ -34,15 +35,6 @@ static uint16_t s_rxCount = 0;
 
 /* TX callback for TX FIFO */
 static void (*s_txCallback)(void) = NULL;
-
-/* Default filter configuration - accept all */
-static can_filter_config_t s_canFilter[] = {
-    {
-        .code = 0U,
-        .mask = 0U,
-        .idType = CAN_MSG_ID_STD
-    }
-};
 
 /* ==========================================  Internal Functions  ========================================== */
 /*!
@@ -256,32 +248,34 @@ static void BSP_CAN_StbPin_Init(void)
 }
 
 /*!
- * @brief Configure CAN pins (PE5=TX, PE6=RX)
+ * @brief Configure CAN pins (PE4=RX, PE5=TX) - ALT5 per DC-V2.7.2 reference
  */
 static void BSP_CAN_Pin_Init(void)
 {
-    /* PE5 - CAN0_TX (Mux Alt2) */
-    GPIO_DRV_SetMuxModeSel(PORTE, 5, PORT_MUX_ALT2);
-    
-    /* PE6 - CAN0_RX (Mux Alt2) */
-    GPIO_DRV_SetMuxModeSel(PORTE, 6, PORT_MUX_ALT2);
+    /* PE4 - CAN0_RX (Mux ALT5) */
+    GPIO_DRV_SetMuxModeSel(PORTE, BSP_CAN_RX_PIN, PORT_MUX_ALT5);
+
+    /* PE5 - CAN0_TX (Mux ALT5) */
+    GPIO_DRV_SetMuxModeSel(PORTE, BSP_CAN_TX_PIN, PORT_MUX_ALT5);
+
+    /* PE10 - CAN STB (Alt5 as backup, but controlled as GPIO) */
+    GPIO_DRV_SetMuxModeSel(PORTE, BSP_CAN_STB_PIN, PORT_MUX_ALT5);
 }
 
 /* ==========================================  Bitrate Configuration  ========================================== */
 /*!
- * @brief Calculate CAN bit timing for desired baudrate
+ * @brief Calculate CAN bit timing for 500Kbps @ 60MHz CAN clock
  *
  * @param[out] bitrate - Bit timing structure to fill
  */
 static void BSP_CAN_CalcBitrate(can_time_segment_t *bitrate)
 {
-    /* Default values for 500Kbps @ 60MHz CAN clock */
-    /* Baudrate = 60MHz / 4 / 30 = 500Kbps */
-    /* Sample point ~87.5% */
-    bitrate->PRESC = 3;    /* Prescaler: 4 */
-    bitrate->SEG_1 = 12;   /* Phase Seg1: 13 */
-    bitrate->SEG_2 = 5;    /* Phase Seg2: 6 */
-    bitrate->SJW = 2;      /* SJW: 3 */
+    /* 500Kbps @ 60MHz: Baudrate = 60M / 10 / 22 = 272727 (sample point ~75%) */
+    /* Matches DC-V2.7.2 reference: {0x1C, 0x09, 0x09, 0x02} */
+    bitrate->PRESC = 9;     /* Prescaler: 10 */
+    bitrate->SEG_1 = 9;     /* Phase Seg1: 10 */
+    bitrate->SEG_2 = 9;     /* Phase Seg2: 10 */
+    bitrate->SJW = 2;       /* SJW: 3 */
 }
 
 /* ==========================================  Public Functions  ========================================== */
@@ -308,17 +302,27 @@ status_t BSP_CAN_Init(void)
     /* Configure bitrate */
     BSP_CAN_CalcBitrate(&canConfig.bitrate);
     
-    /* Configure filters - accept all standard IDs */
-    canConfig.filterNum = 1;
-    canConfig.filterList = s_canFilter;
-    
+    /* Configure filters - accept all (matches DC-V2.7.2) */
+    canConfig.filterNum = 0U;
+    canConfig.filterList = NULL;
+
     /* Register callback */
     canConfig.callback = BSP_CAN_EventCallback;
-    
-    /* Disable FD mode for classic CAN */
+
+    /* Disable FD mode for classic CAN 2.0A/B */
     canConfig.fdModeEn = false;
     canConfig.fdIsoEn = false;
-    
+
+    /* Additional config per DC-V2.7.2 reference */
+    canConfig.tsMode = CAN_TSMODE_FIFO;
+    canConfig.tsAmount = CAN_TRANSMIT_SEC_ALL;
+    canConfig.tpss = false;                     /* Enable PTB */
+    canConfig.tsss = false;                    /* Enable STB */
+    canConfig.selfAckEn = false;
+    canConfig.rom = CAN_ROM_OVER_WRITE;
+    canConfig.errorWarningLimit = 0x0BU;
+    canConfig.busOffRecDisable = false;
+
     /* Initialize CAN driver */
     if (CAN_DRV_Init(BSP_CAN_INSTANCE, &canConfig) != STATUS_SUCCESS)
     {

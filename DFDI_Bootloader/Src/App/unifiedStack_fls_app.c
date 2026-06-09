@@ -284,43 +284,49 @@ do{\
  void Flash_InitDowloadInfo(void)
  {	
      gs_stFlashDownloadInfo.isFingerPrintWritten = FALSE;
- 
+
      if(TRUE == Flash_IsFlashDriverDownload())
      {
          Flash_EraseFlashDriverInRAM();
- 
+
          Flash_SetFlashDriverNotDonwload();
      }	
- 
+
      Flash_SetNextDownloadStep(FL_REQUEST_STEP);
- 
+
      Flash_SetOperateFlashActiveJob(FLASH_IDLE, NULL_PTR, INVALID_UDS_SERVICES_ID, NULL_PTR);
- 
+
      gs_stFlashDownloadInfo.pstAppFlashStatus = &gs_stAppFlashStatus;
      
      fsl_memset(&gs_stFlashDownloadInfo.stFlashOperateAPI, 0x0u, sizeof(tFlashOperateAPI));
- 
+
      fsl_memset(&gs_stAppFlashStatus, 0xFFu, sizeof(tAppFlashStatus));
+
+     Flash_SetFlashDriverDowload();
+     (void)BSP_Flash_RegisterAPI(&gs_stFlashDownloadInfo.stFlashOperateAPI);
  }
  
  /*flash app module init*/
  void FLASH_APP_Init(void)
  {
      gs_stFlashDownloadInfo.isFingerPrintWritten = FALSE;
- 
+
      Flash_EraseFlashDriverInRAM();
- 
+
      Flash_SetFlashDriverNotDonwload();
- 
+
      Flash_SetNextDownloadStep(FL_REQUEST_STEP);
- 
+
      Flash_SetOperateFlashActiveJob(FLASH_IDLE, NULL_PTR, INVALID_UDS_SERVICES_ID, NULL_PTR);
- 
+
      gs_stFlashDownloadInfo.pstAppFlashStatus = &gs_stAppFlashStatus;
      
      fsl_memset(&gs_stFlashDownloadInfo.stFlashOperateAPI, 0x0u, sizeof(tFlashOperateAPI));
- 
-     fsl_memset(&gs_stAppFlashStatus, 0xFFu, sizeof(tAppFlashStatus));	
+
+     fsl_memset(&gs_stAppFlashStatus, 0xFFu, sizeof(tAppFlashStatus));
+
+     Flash_SetFlashDriverDowload();
+     (void)BSP_Flash_RegisterAPI(&gs_stFlashDownloadInfo.stFlashOperateAPI);
  }
  
  /*flash operate main function*/
