@@ -79,6 +79,6 @@
 ".\objects\osif_baremetal.o"
 ".\objects\startup_ac7840x.o"
 ".\objects\system_ac7840x.o"
---library_type=microlib --nodebug --ro-base 0x00000000 --entry 0x00000000 --rw-base 0x1fff0000 --entry Reset_Handler --first __Vectors --strict --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--library_type=microlib --ro-base 0x00000000 --entry 0x00000000 --rw-base 0x1fff0000 --entry Reset_Handler --first __Vectors --strict --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers
 --list ".\Listings\App_Framework.map" -o .\Objects\App_Framework.axf

@@ -25,6 +25,7 @@
 #include "boot.h"
 #include "bsp_crc.h"
 #include "wdg_drv.h"
+#include "rcm_hw.h"
  
  /*******************************************************************************
   * Variables
@@ -42,7 +43,7 @@
   *END**************************************************************************/
  void BOOTLOADER_MAIN_Init(void (*pfBSP_Init)(void), void (*pfAbortTxMsg)(void))
  {
-     uint32 resetSrs = 0u;
+     uint32 resetSrs = RCM_GetResetStatus();
      boolean crcInitOk = FALSE;
  
      (void)WDG_DRV_Deinit(WDG_INST);
@@ -68,12 +69,15 @@
      (void)BSP_UART_Init(NULL_PTR);
  
      APP_DebugPrintf("\nRCM_SRS=0x%08X\n", resetSrs);
+     RCM_ClearResetInterruptStatus();
+     RCM_ClearResetStatus();
      if(TRUE != crcInitOk)
      {
          APP_DebugPrintf("BSP_CRC_Init failed!\n");
      }
      
      (void)BSP_WATCHDOG_Init();
+     (void)BSP_WATCHDOG_Feed();
  
      TIMER_HAL_Init();
  
@@ -91,6 +95,7 @@
      TP_RegisterAbortTxMsg(pfAbortTxMsg);
  
      FLASH_APP_Init();
+     (void)BSP_WATCHDOG_Feed();
  
      /*Print bootloader version*/
      BOOTLOADER_MAIN_PrintVersion();
@@ -105,6 +110,9 @@
   *END**************************************************************************/
  void BOOTLOADER_MAIN_Demo(void)
  {
+     /* Keep watchdog alive from the main loop even if the 100 ms timer tick is unavailable. */
+     (void)BSP_WATCHDOG_Feed();
+
      if(TRUE == TIMER_HAL_Is1msTickTimeout())
      {
          TP_SystemTickCtl();
@@ -119,10 +127,13 @@
      }
  
      TP_MainFun();
+     (void)BSP_WATCHDOG_Feed();
  
      UDS_MainFun();
+     (void)BSP_WATCHDOG_Feed();
  
-     Flash_OperateMainFunction();	
+     Flash_OperateMainFunction();
+     (void)BSP_WATCHDOG_Feed();
  }
  
  /*print bootloader version*/

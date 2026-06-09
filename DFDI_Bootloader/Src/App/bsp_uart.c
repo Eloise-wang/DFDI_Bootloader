@@ -19,10 +19,15 @@
 #include "ac7840x.h"
 #include "ckgen_drv.h"
 #include "device_status.h"
+#include "device_register.h"
+#include "osif.h"
 #include <stdarg.h>
 #include <stdio.h>
 
 /* ============================================  宏定义  ============================================ */
+
+/*!< UART1 base */
+#define BSP_UART_BASE UART1
 
 /*!< UART1 TX pin (PC9) */
 #define BSP_UART_TX_PORT GPIOC
@@ -68,11 +73,17 @@ static void BSP_UART_InitPins(void)
  */
 static void BSP_UART_EnableClock(void)
 {
+    module_clk_config_t clkConfig;
+
     /* 使能GPIO时钟 */
     CKGEN_DRV_Enable(CLK_GPIO, true);
-    
-    /* 使能UART1时钟 */
+
+    /* 配置并使能UART1外设时钟源 */
+    clkConfig.source = HSIDIV2_CLK;
+    clkConfig.div = 1U;
+    CKGEN_DRV_SetModuleClock(UART1_CLK, &clkConfig);
     CKGEN_DRV_Enable(CLK_UART1, true);
+    CKGEN_DRV_SoftReset(SRST_UART1, true);
 }
 
 /*!
@@ -96,8 +107,6 @@ static void BSP_UART_GetDefaultConfig(bsp_uart_config_t *config)
 
 bool BSP_UART_Init(const bsp_uart_config_t *config)
 {
-    status_t status;
-    uart_user_config_t uartConfig;
     bsp_uart_config_t defaultConfig;
     
     if (g_bUartInit)
@@ -118,34 +127,25 @@ bool BSP_UART_Init(const bsp_uart_config_t *config)
     /* 配置引脚 */
     BSP_UART_InitPins();
     
-    /* 填充UART配置 */
-    uartConfig.baudRate = config->baudRate;
-    uartConfig.parityMode = config->parityMode;
-    uartConfig.stopBitCount = config->stopBitCount;
-    uartConfig.bitCountPerChar = config->bitCount;
-    uartConfig.transferType = UART_USING_INTERRUPTS;  /* 中断模式 */
-    uartConfig.rxDMAChannel = 0xFFU;
-    uartConfig.txDMAChannel = 0xFFU;
-    uartConfig.rxCallback = 0;
-    uartConfig.rxCallbackParam = 0;
-    uartConfig.txCallback = 0;
-    uartConfig.txCallbackParam = 0;
-    
-    /* 初始化UART */
-    status = UART_DRV_Init(BSP_UART_INSTANCE, &g_uartState, &uartConfig);
-    if (STATUS_SUCCESS == status)
+    if (0U == (CKGEN->PERI_CLK_MUX2 & (CKGEN_PERI_CLK_MUX2_UART0_MUX_Msk << ((uint32_t)CLK_UART1 * 4U))))
     {
-        g_bUartInit = true;
-        return true;
+        CKGEN->PERI_CLK_MUX2 |= 5U << ((uint32_t)CLK_UART1 * 4U);
     }
-    
-    return false;
+
+    (void)UART_DRV_SetBaudRate(BSP_UART_INSTANCE, config->baudRate);
+    UART_SetBitCountPerChar(BSP_UART_BASE, config->bitCount);
+    UART_SetStopBitCount(BSP_UART_BASE, config->stopBitCount);
+    UART_SetParityMode(BSP_UART_BASE, config->parityMode);
+    UART_SetFIFO(BSP_UART_BASE, true);
+    UART_SetTransmitterCmd(BSP_UART_BASE, true);
+    UART_SetReceiverCmd(BSP_UART_BASE, true);
+
+    g_bUartInit = true;
+    return true;
 }
 
 bool BSP_UART_Send(const uint8_t *pData, uint32_t length)
 {
-    status_t status;
-    
     if ((0 == pData) || (0 == length))
     {
         return false;
@@ -156,15 +156,19 @@ bool BSP_UART_Send(const uint8_t *pData, uint32_t length)
         return false;
     }
     
-    status = UART_DRV_SendDataBlocking(BSP_UART_INSTANCE, pData, length, BSP_UART_TIMEOUT_MS);
-    
-    return (STATUS_SUCCESS == status) ? true : false;
+    for (uint32_t i = 0; i < length; i++)
+    {
+        while (!UART_GetStatusFlag(BSP_UART_BASE, UART_TX_DATA_NOT_FULL))
+        {
+        }
+        UART_Putchar(BSP_UART_BASE, pData[i]);
+    }
+
+    return true;
 }
 
 bool BSP_UART_Receive(uint8_t *pData, uint32_t length, uint32_t timeoutMs)
 {
-    status_t status;
-    
     if ((0 == pData) || (0 == length))
     {
         return false;
@@ -179,10 +183,26 @@ bool BSP_UART_Receive(uint8_t *pData, uint32_t length, uint32_t timeoutMs)
     {
         timeoutMs = BSP_UART_TIMEOUT_MS;
     }
-    
-    status = UART_DRV_ReceiveDataBlocking(BSP_UART_INSTANCE, pData, length, timeoutMs);
-    
-    return (STATUS_SUCCESS == status) ? true : false;
+
+    uint32_t received = 0U;
+    uint32_t startMs = OSIF_GetMilliseconds();
+
+    while (received < length)
+    {
+        if (UART_GetStatusFlag(BSP_UART_BASE, UART_RX_DATA_READY))
+        {
+            UART_Getchar(BSP_UART_BASE, &pData[received]);
+            received++;
+            continue;
+        }
+
+        if ((OSIF_WAIT_FOREVER != timeoutMs) && ((OSIF_GetMilliseconds() - startMs) >= timeoutMs))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool BSP_UART_PutChar(uint8_t data)
@@ -217,8 +237,6 @@ uart_callback_t BSP_UART_InstallTxCallback(uart_callback_t callback, void *pUser
 
 bool BSP_UART_SendAsync(const uint8_t *pData, uint32_t length)
 {
-    status_t status;
-    
     if ((0 == pData) || (0 == length))
     {
         return false;
@@ -228,16 +246,12 @@ bool BSP_UART_SendAsync(const uint8_t *pData, uint32_t length)
     {
         return false;
     }
-    
-    status = UART_DRV_SendData(BSP_UART_INSTANCE, pData, length);
-    
-    return (STATUS_SUCCESS == status) ? true : false;
+
+    return BSP_UART_Send(pData, length);
 }
 
 bool BSP_UART_ReceiveAsync(uint8_t *pData, uint32_t length)
 {
-    status_t status;
-    
     if ((0 == pData) || (0 == length))
     {
         return false;
@@ -247,44 +261,34 @@ bool BSP_UART_ReceiveAsync(uint8_t *pData, uint32_t length)
     {
         return false;
     }
-    
-    status = UART_DRV_ReceiveData(BSP_UART_INSTANCE, pData, length);
-    
-    return (STATUS_SUCCESS == status) ? true : false;
+
+    return BSP_UART_Receive(pData, length, BSP_UART_TIMEOUT_MS);
 }
 
 bool BSP_UART_Deinit(void)
 {
-    status_t status;
-    
     if (!g_bUartInit)
     {
         return true;
     }
-    
-    status = UART_DRV_Deinit(BSP_UART_INSTANCE);
-    
-    if (STATUS_SUCCESS == status)
-    {
-        g_bUartInit = false;
-        return true;
-    }
-    
-    return false;
+
+    UART_SetTransmitterCmd(BSP_UART_BASE, false);
+    UART_SetReceiverCmd(BSP_UART_BASE, false);
+    CKGEN_DRV_SoftReset(SRST_UART1, false);
+    CKGEN_DRV_Enable(CLK_UART1, false);
+    g_bUartInit = false;
+    return true;
 }
 
 bool BSP_UART_SetBaudRate(uint32_t baudRate)
 {
-    status_t status;
-
     if (!g_bUartInit)
     {
         return false;
     }
 
-    status = UART_DRV_SetBaudRate(BSP_UART_INSTANCE, baudRate);
-
-    return (STATUS_SUCCESS == status) ? true : false;
+    (void)UART_DRV_SetBaudRate(BSP_UART_INSTANCE, baudRate);
+    return true;
 }
 
 bool BSP_UART_Printf(const char *fmt, ...)
@@ -295,7 +299,10 @@ bool BSP_UART_Printf(const char *fmt, ...)
 
     if (!g_bUartInit)
     {
-        (void)BSP_UART_Init(NULL);
+        if (!BSP_UART_Init(NULL))
+        {
+            return false;
+        }
     }
 
     va_start(ap, fmt);
@@ -305,7 +312,15 @@ bool BSP_UART_Printf(const char *fmt, ...)
     if (len > 0)
     {
         uint32_t sendLen = ((uint32_t)len >= sizeof(buffer)) ? (sizeof(buffer) - 1U) : (uint32_t)len;
-        (void)BSP_UART_Send((const uint8_t *)buffer, sendLen);
+        for (uint32_t i = 0; i < sendLen; i++)
+        {
+            if (buffer[i] == '\n')
+            {
+                (void)BSP_UART_PutChar((uint8_t)'\r');
+            }
+            (void)BSP_UART_PutChar((uint8_t)buffer[i]);
+        }
+        return true;
     }
-    return (len > 0);
+    return false;
 }

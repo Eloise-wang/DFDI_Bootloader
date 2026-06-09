@@ -291,7 +291,10 @@ status_t BSP_CAN_Init(void)
     
     /* Get default configuration */
     CAN_DRV_GetDefaultConfig(&canConfig);
-    
+
+    /* Disable CAN memory ECC to avoid ECC init timeout */
+    canConfig.memEccEn = false;
+
     /* Configure CAN mode */
     canConfig.canMode = CAN_NORMAL_MODE;
     

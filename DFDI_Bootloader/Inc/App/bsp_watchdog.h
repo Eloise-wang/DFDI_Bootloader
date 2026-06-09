@@ -32,7 +32,7 @@ extern "C" {
 
 /*!< 看门狗默认超时时间 (ms) - 约100ms后触发复位 */
 #ifndef BSP_WDG_TIMEOUT_MS
-#define BSP_WDG_TIMEOUT_MS 100U
+#define BSP_WDG_TIMEOUT_MS 1000U
 #endif
 
 /* ============================================  API  ============================================ */

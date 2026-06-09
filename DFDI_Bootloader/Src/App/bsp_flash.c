@@ -208,6 +208,7 @@ boolean BSP_Flash_RegisterAPI(tFlashOperateAPI *pstFlashOperateAPI)
     pstFlashOperateAPI->pfReadFlashData = BSP_Flash_Hal_ReadData;
     pstFlashOperateAPI->pfFlashDeinit = BSP_Flash_Hal_Deinit;
 
+    volatile int a = 0;  // 加在这里
     return TRUE;
 }
 
@@ -388,6 +389,9 @@ boolean BSP_Flash_ReadData(uint32_t addr, uint32_t len, uint8_t *pDataBuf)
 
 /*
  * @brief 获取Flash驱动保留区信息
+ *
+ * AC78406: Flash驱动是ROM内置的，不需要RAM区的Flash驱动。
+ * 返回FALSE以跳过RAM Flash驱动机制(S32K142遗留代码)。
  */
 boolean BSP_Flash_GetDriverInfo(uint32_t *pFlashDriverStartAddr, uint32_t *pFlashDriverEndAddr)
 {
@@ -396,9 +400,8 @@ boolean BSP_Flash_GetDriverInfo(uint32_t *pFlashDriverStartAddr, uint32_t *pFlas
         return FALSE;
     }
 
-    *pFlashDriverStartAddr = FLASH_RESERVE_START;
-    *pFlashDriverEndAddr = FLASH_RESERVE_END;
-    return TRUE;
+    /* AC78406 uses ROM-based Flash driver, no RAM Flash driver needed */
+    return FALSE;
 }
 
 /*
