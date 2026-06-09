@@ -55,7 +55,7 @@
 #define TX_BUS_FIFO_LEN (100u)
 
 /* FOTA A/B 配置 */
-/* #define EN_SUPPORT_APP_B */
+#define EN_SUPPORT_APP_B
 #ifndef APP_TYPE_ENUM_DEFINED
 #define APP_TYPE_ENUM_DEFINED
 typedef enum
@@ -81,7 +81,8 @@ typedef enum
 #define MCU_S32K14x (2)
 #define MCU_MPC577XX (3)
 #define MCU_S32K142_TYPE (4)
-#define MCU_TYPE (MCU_S32K142_TYPE)
+#define MCU_AC7840_TYPE (5)
+#define MCU_TYPE (MCU_AC7840_TYPE)
 
 /* 未接收到 UDS 消息时跳转 APP 的延迟时间 */
 /* #define EN_DELAY_TIME */

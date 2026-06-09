@@ -12,6 +12,7 @@
 
 #include "boot_cfg.h"
 #include "unifiedStack_fls_app.h"
+#include "bsp_flash.h"
 #include "bsp_crc.h"
 #include "wdg_drv.h"
 
@@ -36,7 +37,37 @@ static const tBootInfo gs_stBootInfo = {
 
 #define GetInfoStorageCRC() (*(uint16 *)(gs_stBootInfo.infoStartAddr + 14u))
 #define SetInforCRC(xCrc) ((*(uint16 *)(gs_stBootInfo.infoStartAddr + 14u)) = (uint16)(xCrc))
-#define APP_VECTOR_TABLE_ADDR (0x0000F200u)
+
+/* 根据槽位获取向量表地址（VTOR = 槽位起始地址） */
+static uint32 Boot_GetVectorTableAddr(tAPPType appType)
+{
+    uint32 addr = 0u;
+    switch (appType)
+    {
+        case APP_A_TYPE:
+            addr = APP_A_VTOR_ADDR;
+            break;
+#ifdef EN_SUPPORT_APP_B
+        case APP_B_TYPE:
+            addr = APP_B_VTOR_ADDR;
+            break;
+#endif
+        default:
+            break;
+    }
+    return addr;
+}
+
+/* 根据跳转地址推导出槽位类型 */
+static tAPPType Boot_GetAppTypeFromAddr(uint32 jumpAddr)
+{
+    tAPPType appType = APP_A_TYPE;
+    if ((jumpAddr >= APP_B_START_ADDR) && (jumpAddr <= APP_B_END_ADDR))
+    {
+        appType = APP_B_TYPE;
+    }
+    return appType;
+}
 
 static boolean Boot_IsInfoValid(void);
 static uint32 Boot_CalculateInfoCRC(void);
@@ -97,22 +128,11 @@ void Boot_PowerONClearAllFlag(void)
 
 void Boot_RemapApplication(void)
 {
-    uint32 totalCoreNo = 0u;
-    uint32 index = 0u;
     tAPPType appType = APP_A_TYPE;
-    uint32 appMirrorAddr = 0u;
-    uint32 appRemapAddr = 0u;
 
-    totalCoreNo = 0u;
-    (void)index;
-    (void)appMirrorAddr;
-    (void)appRemapAddr;
-
-    if (totalCoreNo > 0u)
-    {
-        appType = Flash_GetNewestAPPType();
-        (void)appType;
-    }
+    /* 始终获取最新有效APP（A/B 中选择） */
+    appType = Flash_GetNewestAPPType();
+    (void)appType;
 }
 
 typedef void (*AppAddr)(void);
@@ -123,8 +143,11 @@ volatile uint32 gBootDbg_JumpAddr = 0u;
 
 void Boot_JumpToApp(const uint32 i_AppAddr)
 {
-    uint32 app_msp = *((volatile uint32 *)APP_VECTOR_TABLE_ADDR);
-    uint32 app_reset_vector = *((volatile uint32 *)(APP_VECTOR_TABLE_ADDR + 4u));
+    tAPPType appType = Boot_GetAppTypeFromAddr(i_AppAddr);
+    uint32 vectorTableAddr = Boot_GetVectorTableAddr(appType);
+
+    uint32 app_msp = *((volatile uint32 *)vectorTableAddr);
+    uint32 app_reset_vector = *((volatile uint32 *)(vectorTableAddr + 4u));
     uint32 nvicIndex = 0u;
     AppAddr resetHandle = NULL;
 
@@ -144,7 +167,7 @@ void Boot_JumpToApp(const uint32 i_AppAddr)
         NVIC->ICPR[nvicIndex] = 0xFFFFFFFFu;
     }
 
-    SCB->VTOR = APP_VECTOR_TABLE_ADDR;
+    SCB->VTOR = vectorTableAddr;
 
     __set_MSP(app_msp);
 

@@ -1,12 +1,12 @@
 /*
 *****************************************************************************
 **
-**  File        : ac784x_flash.ld
+**  File        : ac784x_app_b.ld
 **
-**  Abstract    : Linker script for DFDI_App targeting APP_A partition (default).
-**                Flash origin: 0x00010000, length 384KB.
-**                NOTE: Compile APP_B separately using ac784x_app_b.ld.
-**                Vector table starts at partition start (VTOR = 0x00010000).
+**  Abstract    : Linker script for DFDI_App targeting APP_B partition.
+**                Flash origin: 0x00080000, length 384KB.
+**                NOTE: Use this when compiling for APP_B slot.
+**                Vector table starts at partition start (VTOR = 0x00080000).
 **
 **  Target      : Autochips AC78406
 **
@@ -19,23 +19,23 @@
 ENTRY(Reset_Handler)
 
 /* Partition base address: referenced by startup code to set VTOR */
-__APP_FLASH_BASE__ = 0x00010000;
+__APP_FLASH_BASE__ = 0x00080000;
 
 /* Generate a link error if heap and stack don't fit into RAM */
 _Heap_Size  = 0;
 _Stack_Size = 0x800;
 
-/* Memory areas: FLASH at APP_A (0x00010000), RAM at 0x1FFF8000 */
+/* Memory areas: FLASH at APP_B (0x00080000), RAM at 0x1FFF8000 */
 MEMORY
 {
-  FLASH (rx) : ORIGIN = 0x00010000, LENGTH = 384K
+  FLASH (rx) : ORIGIN = 0x00080000, LENGTH = 384K
   RAM  (xrw) : ORIGIN = 0x1FFF8000, LENGTH = 128K
 }
 
 /* Define output sections */
 SECTIONS
 {
-  /* Vector table: must be at partition start (VTOR = 0x00010000).
+  /* Vector table: must be at partition start (VTOR = 0x00080000).
      ARM Cortex-M vector table: MSP @ +0x00, ResetHandler @ +0x04 */
   .isr_vector :
   {
@@ -91,6 +91,7 @@ SECTIONS
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(.fini_array*))
+    KEEP (*(SORT(.fini_array.*)))
     PROVIDE_HIDDEN (__fini_array_end = .);
   } >FLASH
 

@@ -1,11 +1,11 @@
 /*
 *****************************************************************************
 **
-**  File        : ac784x_flash.ld
+**  File        : ac784x_app_a.ld
 **
-**  Abstract    : Linker script for DFDI_App targeting APP_A partition (default).
+**  Abstract    : Linker script for DFDI_App targeting APP_A partition.
 **                Flash origin: 0x00010000, length 384KB.
-**                NOTE: Compile APP_B separately using ac784x_app_b.ld.
+**                NOTE: Reserved for APP_B compilation use.
 **                Vector table starts at partition start (VTOR = 0x00010000).
 **
 **  Target      : Autochips AC78406
@@ -91,6 +91,7 @@ SECTIONS
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(.fini_array*))
+    KEEP (*(SORT(.fini_array.*)))
     PROVIDE_HIDDEN (__fini_array_end = .);
   } >FLASH
 

@@ -18,6 +18,7 @@
 #include "flash_drv.h"
 #include "device_status.h"
 #include "common_types.h"
+#include "user_config.h"
 
 /*******************************************************************************
  * AC7840 Flash配置
@@ -25,7 +26,7 @@
 /* Flash基地址和大小 */
 #define PFLASH_BASE_ADDR         (0x00000000UL)      /* PFlash基地址 */
 #define PFLASH_SIZE             (1024UL * 1024UL)   /* PFlash大小: 1MB */
-#define DFLASH_BASE_ADDR        (0x01000000UL)      /* DFlash基地址 */
+#define DFLASH_BASE_ADDR        (0x10000000UL)      /* DFlash基地址: 128KB @ 0x10000000 */
 
 /* Flash扇区和编程参数 */
 #define PFLASH_PAGE_SIZE         (0x00000800UL)      /* PFlash扇区大小: 2KB */
@@ -37,39 +38,35 @@
 
 /* APP区域定义 - 根据实际需求调整 */
 #define BOOTLOADER_SIZE         (64UL * 1024UL)     /* Bootloader大小: 64KB */
-#define APP_SIZE                (416UL * 1024UL)    /* 每个APP大小: 416KB */
+#define APP_SIZE                (384UL * 1024UL)    /* 每个APP大小: 384KB */
 #define APP_INFO_SIZE           (2UL * 1024UL)      /* APP信息区: 2KB */
 
-/* 地址计算 */
+/* 地址计算 - A/B双区布局（Bank对齐） */
 #define BOOTLOADER_START_ADDR   (PFLASH_BASE_ADDR)                                     /* 0x00000000 */
-#define BOOTLOADER_END_ADDR     (BOOTLOADER_START_ADDR + BOOTLOADER_SIZE - 1UL)          /* 0x0000FFFF */
+#define BOOTLOADER_END_ADDR     (BOOTLOADER_START_ADDR + BOOTLOADER_SIZE - 1UL)         /* 0x0000FFFF */
 
 #define APP_A_START_ADDR        (BOOTLOADER_END_ADDR + 1UL)                             /* 0x00010000 */
-#define APP_A_END_ADDR          (APP_A_START_ADDR + APP_SIZE - 1UL)                      /* 0x0007FFFF */
-#define APP_A_INFO_ADDR         (APP_A_END_ADDR + 1UL)                                  /* 0x00080000 */
-#define APP_A_INFO_END_ADDR     (APP_A_INFO_ADDR + APP_INFO_SIZE - 1UL)                  /* 0x000807FF */
+#define APP_A_END_ADDR          (APP_A_START_ADDR + APP_SIZE - 1UL)                     /* 0x0006FFFF (384KB) */
+#define APP_A_INFO_ADDR         (0x00070000UL)                                          /* 0x00070000, Bank0末尾Info扇区 */
+#define APP_A_INFO_END_ADDR     (APP_A_INFO_ADDR + APP_INFO_SIZE - 1UL)                /* 0x000707FF */
 
-#define APP_B_START_ADDR        (APP_A_INFO_END_ADDR + 1UL)                            /* 0x00080800 */
-#define APP_B_END_ADDR          (APP_B_START_ADDR + APP_SIZE - 1UL)                     /* 0x000FFFFF */
-#define APP_B_INFO_ADDR         (APP_B_END_ADDR + 1UL)                                 /* 0x00100000 */
-#define APP_B_INFO_END_ADDR     (APP_B_INFO_ADDR + APP_INFO_SIZE - 1UL)                  /* 0x001007FF */
+#define APP_B_START_ADDR        (0x00080000UL)                                          /* 0x00080000, Bank1起始 */
+#define APP_B_END_ADDR          (APP_B_START_ADDR + APP_SIZE - 1UL)                     /* 0x000DFFFF (384KB) */
+#define APP_B_INFO_ADDR         (0x000E0000UL)                                          /* 0x000E0000, Bank1末尾Info扇区 */
+#define APP_B_INFO_END_ADDR     (APP_B_INFO_ADDR + APP_INFO_SIZE - 1UL)                 /* 0x000E07FF */
 
-/* Flash剩余空间起始地址 (可用于配置区等) */
-#define FLASH_RESERVE_START     (APP_B_INFO_END_ADDR + 1UL)                            /* 0x00100800 */
-#define FLASH_RESERVE_END       (PFLASH_BASE_ADDR + PFLASH_SIZE - 1UL)                   /* 0x000FFFFF */
+/* Bank0剩余空间（Bootloader和APP_A之间的Reserve区，~198KB） */
+#define FLASH_RESERVE_START     (APP_A_INFO_END_ADDR + 1UL)                            /* 0x00070800 */
+#define FLASH_RESERVE_END       (APP_B_START_ADDR - 1UL)                               /* 0x0007FFFF */
 
-/* APP类型枚举 - 复用 user_config.h 中定义 */
-#ifndef APP_TYPE_ENUM_DEFINED
-#define APP_TYPE_ENUM_DEFINED
-typedef enum
-{
-    APP_A_TYPE = 0,
-#ifdef EN_SUPPORT_APP_B
-    APP_B_TYPE = 1,
-#endif
-    APP_INVLID_TYPE = 0xFF
-} tAPPType;
-#endif
+/* APP向量表统一偏移量（Cortex-M向量表固定偏移0x200） */
+#define APP_VECTOR_TABLE_OFFSET (0x200UL)
+
+/* APP向量表地址 = 槽位起始地址（VTOR值） */
+#define APP_A_VTOR_ADDR   (APP_A_START_ADDR)          /* 0x00010000, VTOR for APP_A */
+#define APP_B_VTOR_ADDR   (APP_B_START_ADDR)          /* 0x00080000, VTOR for APP_B */
+
+/* APP类型枚举 - 统一由 user_config.h 提供（tAPPType 在那里定义） */
 
 /* Flash块信息结构体 */
 typedef struct

@@ -19,18 +19,18 @@
 static flash_config_t g_flashConfig;
 static int g_bFlashInit = 0;
 
-/* APP A Flash块信息 */
+    /* APP Flash块信息 */
 static const BlockInfo_t g_astAppABlockInfo[] =
 {
-    {APP_A_START_ADDR, APP_A_END_ADDR},       /* APP_A代码区 */
-    {APP_A_INFO_ADDR, APP_A_INFO_END_ADDR}     /* APP_A信息区 */
+    {APP_A_START_ADDR, APP_A_END_ADDR},       /* APP_A代码区: 0x00010000 ~ 0x0006FFFF (384KB) */
+    {APP_A_INFO_ADDR, APP_A_INFO_END_ADDR}    /* APP_A Info区: 0x00070000 ~ 0x000707FF (2KB) */
 };
 
 /* APP B Flash块信息 */
 static const BlockInfo_t g_astAppBBlockInfo[] =
 {
-    {APP_B_START_ADDR, APP_B_END_ADDR},       /* APP_B代码区 */
-    {APP_B_INFO_ADDR, APP_B_INFO_END_ADDR}     /* APP_B信息区 */
+    {APP_B_START_ADDR, APP_B_END_ADDR},       /* APP_B代码区: 0x00080000 ~ 0x000DFFFF (384KB) */
+    {APP_B_INFO_ADDR, APP_B_INFO_END_ADDR}    /* APP_B Info区: 0x000E0000 ~ 0x000E07FF (2KB) */
 };
 
 /* APP块信息指针数组 */

@@ -33,8 +33,8 @@ _Stack_Size = 0x800; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-  FLASH (rx)      	: ORIGIN = 0x00000000, LENGTH = 1024K
-  RAM 	(xrw)		: ORIGIN = 0x1FFF8000, LENGTH = 128K
+  FLASH_BOOT (rx)  : ORIGIN = 0x00000000, LENGTH = 64K
+  RAM  (xrw)       : ORIGIN = 0x1FFF8000, LENGTH = 128K
 }
 
 /* Define output sections */
@@ -46,7 +46,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH_BOOT
 
   /* The program code and other data goes into FLASH */
   .text :
@@ -65,39 +65,39 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >FLASH
+  } >FLASH_BOOT
 
 
    .ARM.extab   : 
    { 
 	   *(.ARM.extab* .gnu.linkonce.armextab.*) 
-   } >FLASH
+   } >FLASH_BOOT
     .ARM : {
     __exidx_start = .;
       *(.ARM.exidx*)
       __exidx_end = .;
-    } >FLASH
+    } >FLASH_BOOT
 
   .preinit_array     :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >FLASH
+  } >FLASH_BOOT
   .init_array :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT(.init_array.*)))
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } >FLASH
+  } >FLASH_BOOT
   .fini_array :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(.fini_array*))
     KEEP (*(SORT(.fini_array.*)))
     PROVIDE_HIDDEN (__fini_array_end = .);
-  } >FLASH
+  } >FLASH_BOOT
 
   /* used by the startup to initialize data */
   _sidata = .;
