@@ -108,7 +108,7 @@ int main(void)
 {
     /* 调用Bootloader初始化 - 传入BSP_Init和AbortTxMsg回调 */
     BOOTLOADER_MAIN_Init(BSP_Init, BSP_AbortCANTxMsg);
-		Debug_Printf("\nWelcome enter AC7840 CAN(500K) bootloader!\n");
+	Debug_Printf("\nWelcome enter AC7840 CAN(500K) bootloader!\n");
     
 
     /* 主循环 */

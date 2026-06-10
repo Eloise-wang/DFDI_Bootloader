@@ -35,9 +35,6 @@ void HardFault_Handler(void)
  ******************************************************************************/
 int main(void)
 {
-    /* Watchdog disable - 避免调试时频繁复位 */
-    /* 注意：在实际产品中可能需要启用看门狗 */
-
     /* 初始化 APP Demo */
     APP_Demo_Init();
 

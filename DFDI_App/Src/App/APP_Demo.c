@@ -53,11 +53,15 @@ static void APP_BSP_Init(void);
 void APP_Demo_Init(void)
 {
     APP_BSP_Init();
+    (void)BSP_WATCHDOG_Feed();
 
     UDS_Init();
+    (void)BSP_WATCHDOG_Feed();
     TP_Init();
+    (void)BSP_WATCHDOG_Feed();
 
     Boot_CheckDownlaodAPPStatus();
+    (void)BSP_WATCHDOG_Feed();
 
     APP_DebugPrintf("\nWelcome enter AC7840 CAN(500K) APP demo!\n");
 }
@@ -69,7 +73,7 @@ void APP_Demo_Init(void)
  *END**************************************************************************/
 void APP_Demo_MainFun(void)
 {
-    /* Feed watchdog */
+    /* Keep watchdog alive from the main loop even if the 100 ms timer tick is unavailable. */
     (void)BSP_WATCHDOG_Feed();
 
     if(TRUE == TIMER_HAL_Is1msTickTimeout())
@@ -88,7 +92,10 @@ void APP_Demo_MainFun(void)
     }
 
     TP_MainFun();
+    (void)BSP_WATCHDOG_Feed();
+
     UDS_MainFun();
+    (void)BSP_WATCHDOG_Feed();
 
     if(TRUE == TIMER_HAL_Is100msTickTimeout())
     {
@@ -96,6 +103,7 @@ void APP_Demo_MainFun(void)
     }
 
     APP_SendMsgMainFun();
+    (void)BSP_WATCHDOG_Feed();
 }
 
 /*CAN receive callback handler*/
@@ -138,6 +146,7 @@ static void APP_BSP_Init(void)
 
     /* Initialize Watchdog */
     (void)BSP_WATCHDOG_Init();
+    (void)BSP_WATCHDOG_Feed();
 
     /* Debug print initialization - UART should be ready from system init */
     APP_DebugPrintf("\nAPP BSP Init completed.\n");
