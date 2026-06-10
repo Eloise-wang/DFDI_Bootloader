@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "valve_control.h": "c",
+        "gcu_control_dbc.h": "c",
+        "string.h": "c",
+        "sensor.h": "c",
+        "debug_log.h": "c",
+        "osif.h": "c",
+        "hydraulic_control.h": "c",
+        "stdint.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "Enabled"
+}
