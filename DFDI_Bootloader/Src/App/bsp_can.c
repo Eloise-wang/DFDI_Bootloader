@@ -11,10 +11,11 @@
 #include "gpio_drv.h"
 #include "ckgen_drv.h"
 #include "device_register.h"
+#include "system_ac7840x.h"
 
 /* ============================================  Defines  ============================================ */
-/* CAN 500Kbps @ 60MHz CAN clock: Baudrate = 60M / 10 / 22 = 272727 ~= 500K (sample point ~75%) */
-#define BSP_CAN_STB_ACTIVE_VALUE   (1U)    /* 1 = Normal mode, 0 = Standby */
+/* CAN 500Kbps @ 60MHz CAN clock, aligned with the DC reference project */
+#define BSP_CAN_STB_ACTIVE_VALUE   (0U)   
 
 /* ==========================================  Variables  ========================================== */
 /* TX busy flag */
@@ -35,8 +36,10 @@ static uint16_t s_rxCount = 0;
 
 /* TX callback for TX FIFO */
 static void (*s_txCallback)(void) = NULL;
+static bsp_can_rx_callback_t s_rxCallback = NULL;
 
 /* ==========================================  Internal Functions  ========================================== */
+
 /*!
  * @brief Check if TX FIFO is empty
  */
@@ -185,54 +188,44 @@ static void BSP_CAN_EventCallback(uint8_t instance, uint32_t event, uint32_t koe
     {
         return;
     }
-    
-    switch (event)
+
+    if ((event & CAN_EVENT_RECEIVE_DONE) != 0U)
     {
-        case CAN_EVENT_RECEIVE_DONE:
+        can_msg_info_t rxInfo;
+        uint8_t rxData[8] = {0};
+
+        rxInfo.DATA = rxData;
+
+        /* Read received message */
+        if (CAN_DRV_Receive(instance, &rxInfo) == STATUS_SUCCESS)
         {
-            can_msg_info_t rxInfo;
-            
-            /* Read received message */
-            if (CAN_DRV_Receive(instance, &rxInfo) == STATUS_SUCCESS)
-            {
-                /* Write to RX FIFO - disable interrupt during write */
-                __disable_irq();
-                (void)BSP_CAN_WriteRxFifo(rxInfo.ID, rxInfo.DLC, rxInfo.DATA);
-                __enable_irq();
-            }
-            break;
+            /* Write to RX FIFO - disable interrupt during write */
+            __disable_irq();
+            (void)BSP_CAN_WriteRxFifo(rxInfo.ID, rxInfo.DLC, rxInfo.DATA);
+            __enable_irq();
         }
-        
-        case CAN_EVENT_TRANS_PRI_DONE:
-        case CAN_EVENT_TRANS_SEC_DONE:
+    }
+
+    if ((event & (CAN_EVENT_TRANS_PRI_DONE | CAN_EVENT_TRANS_SEC_DONE)) != 0U)
+    {
+        s_txBusy = false;
+
+        /* Execute TX callback if registered */
+        if (s_txCallback != NULL)
         {
-            s_txBusy = false;
-            
-            /* Execute TX callback if registered */
-            if (s_txCallback != NULL)
-            {
-                s_txCallback();
-                s_txCallback = NULL;
-            }
-            break;
+            s_txCallback();
+            s_txCallback = NULL;
         }
-        
-        case CAN_EVENT_ERROR:
-        case CAN_EVENT_BUS_ERROR:
-        case CAN_EVENT_ERROR_PASSIVE:
-        {
-            /* Error handling */
-            break;
-        }
-        
-        case CAN_EVENT_RBUF_OVERRUN:
-        {
-            /* Receive buffer overrun */
-            break;
-        }
-        
-        default:
-            break;
+    }
+
+    if ((event & CAN_EVENT_RBUF_OVERRUN) != 0U)
+    {
+        /* Receive buffer overrun */
+    }
+
+    if ((event & (CAN_EVENT_ERROR | CAN_EVENT_BUS_ERROR | CAN_EVENT_ERROR_PASSIVE)) != 0U)
+    {
+        /* Error handling */
     }
 }
 
@@ -248,7 +241,7 @@ static void BSP_CAN_StbPin_Init(void)
 }
 
 /*!
- * @brief Configure CAN pins (PE4=RX, PE5=TX) - ALT5 
+ * @brief Configure CAN pins (PE4=RX, PE5=TX) - ALT5
  */
 static void BSP_CAN_Pin_Init(void)
 {
@@ -258,8 +251,7 @@ static void BSP_CAN_Pin_Init(void)
     /* PE5 - CAN0_TX (Mux ALT5) */
     GPIO_DRV_SetMuxModeSel(PORTE, BSP_CAN_TX_PIN, PORT_MUX_ALT5);
 
-    /* PE10 - CAN STB (Alt5 as backup, but controlled as GPIO) */
-    GPIO_DRV_SetMuxModeSel(PORTE, BSP_CAN_STB_PIN, PORT_MUX_ALT5);
+    /* PE10 is kept as GPIO because it drives the external transceiver standby pin. */
 }
 
 /* ==========================================  Bitrate Configuration  ========================================== */
@@ -270,19 +262,46 @@ static void BSP_CAN_Pin_Init(void)
  */
 static void BSP_CAN_CalcBitrate(can_time_segment_t *bitrate)
 {
-    /* 500Kbps @ 60MHz: Baudrate = 60M / 10 / 22 = 272727 (sample point ~75%) */
-    /* Matches DC-V2.7.2 reference: {0x1C, 0x09, 0x09, 0x02} */
-    bitrate->PRESC = 9;     /* Prescaler: 10 */
-    bitrate->SEG_1 = 9;     /* Phase Seg1: 10 */
-    bitrate->SEG_2 = 9;     /* Phase Seg2: 10 */
-    bitrate->SJW = 2;       /* SJW: 3 */
+    /* can_time_segment_t order is SEG_1, SEG_2, SJW, PRESC. */
+    /* 500Kbps @ 60MHz: 60M / ((2 + 1) * (1 + (28 + 1) + (9 + 1))) = 500K. */
+    bitrate->SEG_1 = 0x1CU;
+    bitrate->SEG_2 = 0x09U;
+    bitrate->SJW = 0x09U;
+    bitrate->PRESC = 0x02U;
 }
 
 /* ==========================================  Public Functions  ========================================== */
+status_t BSP_CAN_ClockInit(void)
+{
+    module_clk_config_t canClkConfig;
+    module_clk_config_t timerClkConfig;
+
+    if (SetSysClkToSPLL(1U, 120U) != 0U)
+    {
+        return STATUS_ERROR;
+    }
+
+    SystemCoreClockUpdate();
+
+    CKGEN_DRV_Enable(CLK_GPIO, true);
+
+    canClkConfig.source = CORE_CLK;
+    canClkConfig.div = 2U;
+    CKGEN_DRV_SetModuleClock(CAN0_CLK, &canClkConfig);
+
+    /* TEST_CAN periodic sending depends on TIMER_HAL_Init(), whose source clock
+     * must be configured explicitly just like the DC reference project. */
+    timerClkConfig.source = HSEDIV2_CLK;
+    timerClkConfig.div = 1U;
+    CKGEN_DRV_SetModuleClock(TIMER_CLK, &timerClkConfig);
+
+    return STATUS_SUCCESS;
+}
+
 status_t BSP_CAN_Init(void)
 {
     can_user_config_t canConfig;
-    
+
     /* Initialize STB pin */
     BSP_CAN_StbPin_Init();
     
@@ -402,6 +421,53 @@ void BSP_CAN_TxTask(void)
     }
 }
 
+void BSP_CAN_RxTask(void)
+{
+    bsp_can_rx_info_t rxInfo;
+    bsp_can_msg_t msg;
+
+    if (s_rxCallback == NULL)
+    {
+        return;
+    }
+
+    while (BSP_CAN_ReadRxFifo(&rxInfo))
+    {
+        msg.id = rxInfo.rxDataId;
+        msg.dlc = rxInfo.rxDataLen;
+
+        for (uint8_t i = 0; i < 8U; i++)
+        {
+            msg.data[i] = rxInfo.aucDataBuf[i];
+        }
+
+        s_rxCallback(&msg);
+    }
+
+    while (CAN_DRV_GetRbufStatus(BSP_CAN_INSTANCE) != CAN_RSTAT_EMPTY)
+    {
+        can_msg_info_t drvRxInfo;
+        uint8_t rxData[8] = {0};
+
+        drvRxInfo.DATA = rxData;
+
+        if (CAN_DRV_Receive(BSP_CAN_INSTANCE, &drvRxInfo) != STATUS_SUCCESS)
+        {
+            break;
+        }
+
+        msg.id = drvRxInfo.ID;
+        msg.dlc = drvRxInfo.DLC;
+
+        for (uint8_t i = 0; i < 8U; i++)
+        {
+            msg.data[i] = rxData[i];
+        }
+
+        s_rxCallback(&msg);
+    }
+}
+
 bool BSP_CAN_IsTxBusy(void)
 {
     return s_txBusy;
@@ -425,7 +491,7 @@ void BSP_CAN_AbortTx(void)
 
 void BSP_CAN_SetStbPin(uint8_t active)
 {
-    GPIO_DRV_WritePin(BSP_CAN_STB_GPIO, BSP_CAN_STB_PIN, active ? 1 : 0);
+    GPIO_DRV_WritePin(BSP_CAN_STB_GPIO, BSP_CAN_STB_PIN, active ? 1U : 0U);
 }
 
 /* ==========================================  Legacy API  ========================================== */
@@ -462,8 +528,7 @@ status_t BSP_CAN_TransmitBlocking(uint32_t id, uint8_t dlc, const uint8_t *data,
 
 void BSP_CAN_InstallRxCallback(bsp_can_rx_callback_t callback)
 {
-    /* Legacy compatibility - not used with FIFO mode */
-    (void)callback;
+    s_rxCallback = callback;
 }
 
 /* =============================================  EOF  ============================================== */

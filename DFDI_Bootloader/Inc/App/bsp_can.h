@@ -26,7 +26,7 @@ extern "C" {
 #define BSP_CAN_STB_PORT        (PORTE)
 #define BSP_CAN_STB_PIN         (10U)
 #define BSP_CAN_STB_GPIO        (GPIOE)
-#define BSP_CAN_STB_ACTIVE      (1U)          /* 1 = Normal mode, 0 = Standby */
+#define BSP_CAN_STB_ACTIVE      (0U)          /* 0 = Normal mode, 1 = Standby */
 
 /* CAN pins - PE4=RX, PE5=TX (ALT5) */
 #define BSP_CAN_RX_PORT         (PORTE)
@@ -71,6 +71,13 @@ typedef void (*bsp_can_rx_callback_t)(const bsp_can_msg_t *msg);
 
 /* ===========================================  FIFO API  =========================================== */
 /*!
+ * @brief Initialize the clock tree required by CAN
+ *
+ * @return STATUS_SUCCESS if the clock tree is configured correctly
+ */
+status_t BSP_CAN_ClockInit(void);
+
+/*!
  * @brief Initialize BSP CAN peripheral with FIFO support
  *
  * @return status_t - STATUS_SUCCESS if initialized successfully
@@ -91,6 +98,14 @@ status_t BSP_CAN_Deinit(void);
  * @return none
  */
 void BSP_CAN_TxTask(void);
+
+/*!
+ * @brief CAN receive task - call periodically to dispatch messages from RX FIFO
+ *        to the installed RX callback in task context
+ *
+ * @return none
+ */
+void BSP_CAN_RxTask(void);
 
 /*!
  * @brief Check if CAN TX is busy (transmitting)
@@ -124,7 +139,7 @@ uint16_t BSP_CAN_GetRxFifoCount(void);
 /*!
  * @brief CAN STB pin control
  *
- * @param[in] active - 1 = Normal mode, 0 = Standby mode
+ * @param[in] active - 0 = Normal mode, 1 = Standby mode
  * @return none
  */
 void BSP_CAN_SetStbPin(uint8_t active);
