@@ -31,7 +31,7 @@ function Get-Sha256Hex {
 function Get-Crc16 {
     param([byte[]]$Data)
 
-    $crc = 0xffff
+    $crc = 0x0000
     foreach ($byte in $Data) {
         $crc = $crc -bxor $byte
         for ($i = 0; $i -lt 8; $i++) {
@@ -43,7 +43,7 @@ function Get-Crc16 {
         }
     }
 
-    return $crc
+    return ($crc -bxor 0xffff) -band 0xffff
 }
 
 function New-ImageEntry {
@@ -101,15 +101,25 @@ $manifest = [ordered]@{
     images  = $images
 }
 
-$manifestJson = $manifest | ConvertTo-Json -Depth 4 -Compress
-$manifestBytes = [System.Text.Encoding]::UTF8.GetBytes($manifestJson)
-$dataOffset = $packageHeaderSize + $manifestBytes.Length
-$images[0].dataOffset = $dataOffset
-$dataOffset += $payloadA.Length
-$images[1].dataOffset = $dataOffset
+$manifestBytes = $null
+$lastManifestLength = -1
 
-$manifestJson = $manifest | ConvertTo-Json -Depth 4 -Compress
-$manifestBytes = [System.Text.Encoding]::UTF8.GetBytes($manifestJson)
+while ($true) {
+    $manifestJson = $manifest | ConvertTo-Json -Depth 4 -Compress
+    $manifestBytes = [System.Text.Encoding]::UTF8.GetBytes($manifestJson)
+    $manifestLength = $manifestBytes.Length
+    $dataOffset = $packageHeaderSize + $manifestLength
+
+    $images[0].dataOffset = $dataOffset
+    $dataOffset += $payloadA.Length
+    $images[1].dataOffset = $dataOffset
+
+    if ($manifestLength -eq $lastManifestLength) {
+        break
+    }
+
+    $lastManifestLength = $manifestLength
+}
 
 $header = New-Object byte[] $packageHeaderSize
 [System.Text.Encoding]::ASCII.GetBytes($packageMagic).CopyTo($header, 0)
@@ -126,6 +136,20 @@ try {
     $output.Write($payloadB, 0, $payloadB.Length)
 } finally {
     $output.Dispose()
+}
+
+$packageBytes = [System.IO.File]::ReadAllBytes($outputPkg)
+$checkA = New-Object byte[] $payloadA.Length
+$checkB = New-Object byte[] $payloadB.Length
+[Array]::Copy($packageBytes, $images[0].dataOffset, $checkA, 0, $payloadA.Length)
+[Array]::Copy($packageBytes, $images[1].dataOffset, $checkB, 0, $payloadB.Length)
+
+if ((Get-Sha256Hex -Data $checkA) -ne $images[0].sha256) {
+    throw 'package verify failed for slot A'
+}
+
+if ((Get-Sha256Hex -Data $checkB) -ne $images[1].sha256) {
+    throw 'package verify failed for slot B'
 }
 
 Write-Host "[PACK] created $outputPkg"

@@ -652,6 +652,31 @@
              gs_stDowloadDataInfo.dataLen |= m_pstPDUMsg->aDataBuf[Index + 7u];
          }
      }
+
+    if(TRUE == Ret)
+    {
+        if(FALSE == Flash_IsFlashDriverData(gs_stDowloadDataInfo.startAddr, gs_stDowloadDataInfo.dataLen))
+        {
+            tAPPType targetAPPType = Flash_GetTargetAPPType();
+            if((APP_INVLID_TYPE != targetAPPType) && (TRUE == Flash_IsAPPTypeErased(targetAPPType)))
+            {
+                if(APP_A_TYPE == targetAPPType)
+                {
+                    gs_stDowloadDataInfo.startAddr = APP_A_START_ADDR;
+                }
+#ifdef EN_SUPPORT_APP_B
+                else if(APP_B_TYPE == targetAPPType)
+                {
+                    gs_stDowloadDataInfo.startAddr = APP_B_START_ADDR;
+                }
+#endif
+                else
+                {
+                    Ret = FALSE;
+                }
+            }
+        }
+    }
  
      /*Is download data  addr  and len valid?*/
      if(((TRUE != UDS_IsDownloadDataAddrValid(gs_stDowloadDataInfo.startAddr, gs_stDowloadDataInfo.dataLen))) ||

@@ -8062,12 +8062,14 @@ var import_promises = __toESM(require("fs/promises"));
 var PACKAGE_MAGIC = "DFPK";
 var PACKAGE_VERSION = 1;
 var PACKAGE_HEADER_SIZE = 12;
+var SLOT_A = 0;
 var crc = new import_ECB2.CRC("self", 16, 15717, 0, 65535, true, true);
 var maxChunkSize = void 0;
 var content = void 0;
 var pendingCrcResult = void 0;
 var currentPackage = void 0;
 var currentImage = void 0;
+var needRequestDownload = false;
 var fileList = [import_path.default.join(process.env.PROJECT_ROOT, "bin", "DFDI_APP.bin")];
 function sha256Of(data) {
   return import_crypto.default.createHash("sha256").update(data).digest("hex");
@@ -8117,6 +8119,15 @@ function loadImagePayload(pkg, image) {
   }
   return payload;
 }
+function buildRequestDownloadPdu(addr, size) {
+  const pdu = Buffer.alloc(11);
+  pdu.writeUInt8(52, 0);
+  pdu.writeUInt8(0, 1);
+  pdu.writeUInt8(68, 2);
+  pdu.writeUInt32BE(addr >>> 0, 3);
+  pdu.writeUInt32BE(size >>> 0, 7);
+  return pdu;
+}
 Util.Init(async () => {
   const req = import_ECB2.DiagRequest.from("Tester_1.RoutineControl491");
   req.diagSetParameter("routineControlType", 1);
@@ -8144,14 +8155,6 @@ Util.On("Tester_1.RoutineControl490.recv", (v) => {
     console.log(`[BOOTLOADER] RC490 resp-: NRC=0x${v.diagGetResponseCode().toString(16)} raw=${raw.toString("hex").toUpperCase()}`);
   }
 });
-Util.On("Tester_1.RequestDownload520.recv", (v) => {
-  const raw = v.diagGetRaw();
-  if (v.diagIsPositiveResponse()) {
-    console.log(`[BOOTLOADER] R34 resp+: ${raw.toString("hex").toUpperCase()}`);
-  } else {
-    console.log(`[BOOTLOADER] R34 resp-: NRC=0x${v.diagGetResponseCode().toString(16)} raw=${raw.toString("hex").toUpperCase()}`);
-  }
-});
 Util.On("Tester_1.SecurityAccess390.recv", async (v) => {
   const data = v.diagGetParameterRaw("securitySeed");
   const cipher = import_crypto.default.createCipheriv(
@@ -8173,15 +8176,16 @@ Util.Register("Tester_1.JobFunction0", async () => {
     console.log(`[BOOTLOADER] start job: package=${currentPackage.filePath}`);
     console.log(`[BOOTLOADER] package images=${currentPackage.manifest.images.length}`);
     const list = [];
-    const r34 = import_ECB2.DiagRequest.from("Tester_1.RequestDownload520");
     content = void 0;
     currentImage = void 0;
     pendingCrcResult = void 0;
+    maxChunkSize = void 0;
+    needRequestDownload = false;
     const eraseReq = import_ECB2.DiagRequest.from("Tester_1.RoutineControl491");
     eraseReq.diagSetParameter("routineIdentifier", 65280);
     eraseReq.diagSetParameterSize("routineControlOptionRecord", 0);
     console.log("[BOOTLOADER] erase: routine=0xFF00");
-    eraseReq.On("recv", (resp) => {
+    eraseReq.On("recv", async (resp) => {
       const raw = resp.diagGetRaw();
       if (!resp.diagIsPositiveResponse()) {
         return;
@@ -8201,16 +8205,38 @@ Util.Register("Tester_1.JobFunction0", async () => {
           `package crc16 mismatch for slot ${currentImage.slotName}: manifest=0x${currentImage.crc16.toString(16)} calc=0x${pendingCrcResult.toString(16)}`
         );
       }
-      const memoryAddress = Buffer.alloc(4);
-      memoryAddress.writeUInt32BE(currentImage.loadAddress);
-      r34.diagSetParameterRaw("memoryAddress", memoryAddress);
-      r34.diagSetParameter("memorySize", content.length);
       console.log(
         `[BOOTLOADER] selected slot=${currentImage.slotName} addr=0x${currentImage.loadAddress.toString(16)} size=${content.length} crc=0x${pendingCrcResult.toString(16)}`
       );
+      needRequestDownload = true;
     });
     list.push(eraseReq);
+    return list;
+  } else {
+    return [];
+  }
+});
+Util.Register("Tester_1.JobFunction1", () => {
+  if (needRequestDownload) {
+    if (!currentImage || !content) {
+      throw new Error("request download without selected image");
+    }
+    const serviceName = currentImage.slotType === SLOT_A ? "Tester_1.RequestDownload520_A" : "Tester_1.RequestDownload520_B";
+    const r34 = import_ECB2.DiagRequest.from(serviceName);
+    const raw = buildRequestDownloadPdu(currentImage.loadAddress, content.length);
+    r34.diagSetRaw(raw);
+    console.log(
+      `[BOOTLOADER] R34 send raw=${raw.toString("hex").toUpperCase()} slot=${currentImage.slotName} addr=0x${currentImage.loadAddress.toString(
+        16
+      )} size=${content.length}`
+    );
     r34.On("recv", (resp) => {
+      const respRaw = resp.diagGetRaw().toString("hex").toUpperCase();
+      if (resp.diagIsPositiveResponse()) {
+        console.log(`[BOOTLOADER] R34 resp+: ${respRaw}`);
+      } else {
+        console.log(`[BOOTLOADER] R34 resp-: NRC=0x${resp.diagGetResponseCode().toString(16)} raw=${respRaw}`);
+      }
       const buf = resp.diagGetParameterRaw("maxNumberOfBlockLength");
       const hex = buf.toString("hex").toUpperCase();
       if (buf.length >= 2) {
@@ -8222,15 +8248,11 @@ Util.Register("Tester_1.JobFunction0", async () => {
       }
       console.log(`[BOOTLOADER] maxNumberOfBlockLength raw=${hex} val=${maxChunkSize}`);
     });
-    list.push(r34);
-    return list;
-  } else {
-    return [];
+    needRequestDownload = false;
+    return [r34];
   }
-});
-Util.Register("Tester_1.JobFunction1", () => {
   if (maxChunkSize == void 0 || maxChunkSize <= 2) {
-    throw new Error("maxNumberOfBlockLength is undefined or too small");
+    return [];
   }
   if (content) {
     maxChunkSize -= 2;

@@ -37,6 +37,7 @@ let content: undefined | Buffer = undefined
 let pendingCrcResult: number | undefined = undefined
 let currentPackage: UpgradePackage | undefined = undefined
 let currentImage: PackageImage | undefined = undefined
+let needRequestDownload = false
 const fileList: string[] = [path.join(process.env.PROJECT_ROOT, 'bin', 'DFDI_APP.bin')]
 
 function sha256Of(data: Buffer): string {
@@ -97,6 +98,16 @@ function loadImagePayload(pkg: UpgradePackage, image: PackageImage): Buffer {
   return payload
 }
 
+function buildRequestDownloadPdu(addr: number, size: number): Buffer {
+  const pdu = Buffer.alloc(11)
+  pdu.writeUInt8(0x34, 0)
+  pdu.writeUInt8(0x00, 1)
+  pdu.writeUInt8(0x44, 2)
+  pdu.writeUInt32BE(addr >>> 0, 3)
+  pdu.writeUInt32BE(size >>> 0, 7)
+  return pdu
+}
+
 Util.Init(async () => {
   //change routineControlType
   const req = DiagRequest.from('Tester_1.RoutineControl491')
@@ -128,15 +139,6 @@ Util.On('Tester_1.RoutineControl490.recv', (v) => {
   }
 })
 
-Util.On('Tester_1.RequestDownload520.recv', (v) => {
-  const raw = v.diagGetRaw()
-  if (v.diagIsPositiveResponse()) {
-    console.log(`[BOOTLOADER] R34 resp+: ${raw.toString('hex').toUpperCase()}`)
-  } else {
-    console.log(`[BOOTLOADER] R34 resp-: NRC=0x${v.diagGetResponseCode().toString(16)} raw=${raw.toString('hex').toUpperCase()}`)
-  }
-})
-
 Util.On('Tester_1.SecurityAccess390.recv', async (v) => {
   const data = v.diagGetParameterRaw('securitySeed')
   const cipher = crypto.createCipheriv(
@@ -160,16 +162,17 @@ Util.Register('Tester_1.JobFunction0', async () => {
     console.log(`[BOOTLOADER] package images=${currentPackage.manifest.images.length}`)
     const list = []
 
-    const r34 = DiagRequest.from('Tester_1.RequestDownload520')
     content = undefined
     currentImage = undefined
     pendingCrcResult = undefined
+    maxChunkSize = undefined
+    needRequestDownload = false
 
     const eraseReq = DiagRequest.from('Tester_1.RoutineControl491')
     eraseReq.diagSetParameter('routineIdentifier', 0xff00)
     eraseReq.diagSetParameterSize('routineControlOptionRecord', 0)
     console.log('[BOOTLOADER] erase: routine=0xFF00')
-    eraseReq.On('recv', (resp) => {
+    eraseReq.On('recv', async (resp) => {
       const raw = resp.diagGetRaw()
       if (!resp.diagIsPositiveResponse()) {
         return
@@ -190,18 +193,43 @@ Util.Register('Tester_1.JobFunction0', async () => {
         )
       }
 
-      const memoryAddress = Buffer.alloc(4)
-      memoryAddress.writeUInt32BE(currentImage.loadAddress)
-      r34.diagSetParameterRaw('memoryAddress', memoryAddress)
-      r34.diagSetParameter('memorySize', content.length)
-
       console.log(
         `[BOOTLOADER] selected slot=${currentImage.slotName} addr=0x${currentImage.loadAddress.toString(16)} size=${content.length} crc=0x${pendingCrcResult.toString(16)}`
       )
+
+      needRequestDownload = true
     })
     list.push(eraseReq)
+    return list
+  } else {
+    return []
+  }
+})
+Util.Register('Tester_1.JobFunction1', () => {
+  if (needRequestDownload) {
+    if (!currentImage || !content) {
+      throw new Error('request download without selected image')
+    }
+
+    const serviceName = currentImage.slotType === SLOT_A ? 'Tester_1.RequestDownload520_A' : 'Tester_1.RequestDownload520_B'
+    const r34 = DiagRequest.from(serviceName)
+    const raw = buildRequestDownloadPdu(currentImage.loadAddress, content.length)
+    r34.diagSetRaw(raw)
+
+    console.log(
+      `[BOOTLOADER] R34 send raw=${raw.toString('hex').toUpperCase()} slot=${currentImage.slotName} addr=0x${currentImage.loadAddress.toString(
+        16
+      )} size=${content.length}`
+    )
 
     r34.On('recv', (resp) => {
+      const respRaw = resp.diagGetRaw().toString('hex').toUpperCase()
+      if (resp.diagIsPositiveResponse()) {
+        console.log(`[BOOTLOADER] R34 resp+: ${respRaw}`)
+      } else {
+        console.log(`[BOOTLOADER] R34 resp-: NRC=0x${resp.diagGetResponseCode().toString(16)} raw=${respRaw}`)
+      }
+
       const buf = resp.diagGetParameterRaw('maxNumberOfBlockLength')
       const hex = buf.toString('hex').toUpperCase()
       if (buf.length >= 2) {
@@ -213,15 +241,13 @@ Util.Register('Tester_1.JobFunction0', async () => {
       }
       console.log(`[BOOTLOADER] maxNumberOfBlockLength raw=${hex} val=${maxChunkSize}`)
     })
-    list.push(r34)
-    return list
-  } else {
-    return []
+
+    needRequestDownload = false
+    return [r34]
   }
-})
-Util.Register('Tester_1.JobFunction1', () => {
+
   if (maxChunkSize == undefined || maxChunkSize <= 2) {
-    throw new Error('maxNumberOfBlockLength is undefined or too small')
+    return []
   }
   if (content) {
     maxChunkSize -= 2

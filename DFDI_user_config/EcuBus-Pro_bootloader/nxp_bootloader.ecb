@@ -620,8 +620,115 @@
           ],
           "0x34": [
             {
-              "id": "89c72290-bae3-4faa-b60c-582690f342ce",
-              "name": "RequestDownload520",
+              "id": "1d78e30c-1a6c-4c3d-92a0-3f1f77d0af8e",
+              "name": "RequestDownload520_A",
+              "serviceId": "0x34",
+              "params": [
+                {
+                  "id": "5b382df3-1e0d-49cb-87c9-462a4653667c",
+                  "name": "dataFormatIdentifier",
+                  "bitLen": 8,
+                  "deletable": true,
+                  "editable": true,
+                  "type": "NUM",
+                  "value": {
+                    "type": "Buffer",
+                    "data": [
+                      0
+                    ]
+                  },
+                  "phyValue": "00"
+                },
+                {
+                  "id": "44f5d33b-1785-4ff2-a0d1-1d8b0d2dd1aa",
+                  "name": "addressAndLengthFormatIdentifier",
+                  "bitLen": 8,
+                  "deletable": true,
+                  "editable": true,
+                  "type": "NUM",
+                  "value": {
+                    "type": "Buffer",
+                    "data": [
+                      68
+                    ]
+                  },
+                  "phyValue": 68
+                },
+                {
+                  "id": "a3b8c8c4-d60c-4c43-a8e0-c54f6869f7b4",
+                  "name": "memoryAddress",
+                  "bitLen": 32,
+                  "deletable": true,
+                  "editable": true,
+                  "type": "NUM",
+                  "value": {
+                    "type": "Buffer",
+                    "data": [
+                      0,
+                      1,
+                      0,
+                      0
+                    ]
+                  },
+                  "phyValue": 65536
+                },
+                {
+                  "id": "b2b0e61c-cbd8-4c0a-a358-7dcba2c85d8c",
+                  "name": "memorySize",
+                  "bitLen": 32,
+                  "deletable": true,
+                  "editable": true,
+                  "type": "NUM",
+                  "value": {
+                    "type": "Buffer",
+                    "data": [
+                      0,
+                      0,
+                      0,
+                      0
+                    ]
+                  },
+                  "phyValue": 0
+                }
+              ],
+              "respParams": [
+                {
+                  "id": "bbd2a6dd-31d0-4a0a-9a8b-5454b9971e7c",
+                  "name": "lengthFormatIdentifier",
+                  "bitLen": 8,
+                  "deletable": true,
+                  "editable": true,
+                  "type": "NUM",
+                  "value": {
+                    "type": "Buffer",
+                    "data": [
+                      0
+                    ]
+                  },
+                  "phyValue": "00"
+                },
+                {
+                  "id": "0fbbf56c-9642-47c1-9a8b-34f3bce3d1df",
+                  "name": "maxNumberOfBlockLength",
+                  "bitLen": 8,
+                  "deletable": true,
+                  "editable": true,
+                  "type": "ARRAY",
+                  "value": {
+                    "type": "Buffer",
+                    "data": [
+                      0
+                    ]
+                  },
+                  "phyValue": "00"
+                }
+              ],
+              "suppress": false,
+              "autoSubfunc": true
+            },
+            {
+              "id": "aaf5c2f0-1a94-4df1-8c21-66e9fb9e92b7",
+              "name": "RequestDownload520_B",
               "serviceId": "0x34",
               "params": [
                 {
@@ -665,12 +772,12 @@
                     "type": "Buffer",
                     "data": [
                       0,
+                      8,
                       0,
-                      242,
                       0
                     ]
                   },
-                  "phyValue": 61952
+                  "phyValue": 524288
                 },
                 {
                   "id": "5526a950-8666-45c3-b976-22fb0764ba9f",
@@ -683,12 +790,12 @@
                     "type": "Buffer",
                     "data": [
                       0,
-                      3,
-                      11,
+                      0,
+                      0,
                       0
                     ]
                   },
-                  "phyValue": 199424
+                  "phyValue": 0
                 }
               ],
               "respParams": [
@@ -1180,14 +1287,14 @@
         "label": "Message",
         "id": "message",
         "layoutType": "bottom",
-        "hide": true
+        "hide": false
       },
       "f6382924-1e8a-4cda-9d1a-c83aba366322_sequence": {
         "pos": {
-          "x": 31,
+          "x": 1018,
           "y": 0,
-          "w": 1656,
-          "h": 583
+          "w": 688,
+          "h": 550
         },
         "title": "testerSequence",
         "label": "Sequence",
@@ -1207,30 +1314,17 @@
         },
         "isMax": false
       },
-      "f6382924-1e8a-4cda-9d1a-c83aba366322_services": {
+      "tester": {
         "pos": {
-          "x": 97.5,
-          "y": 98,
-          "w": 1131,
+          "x": 40.5,
+          "y": 65,
+          "w": 816,
           "h": 400
         },
-        "title": "testerService",
-        "label": "Service",
-        "id": "f6382924-1e8a-4cda-9d1a-c83aba366322_services",
-        "options": {
-          "params": {
-            "edit-index": "f6382924-1e8a-4cda-9d1a-c83aba366322"
-          },
-          "name": "Tester_1"
-        },
-        "hide": false,
-        "backupPos": {
-          "x": 494.5,
-          "y": 104,
-          "w": 1131,
-          "h": 400
-        },
-        "isMax": false
+        "title": "tester",
+        "label": "UDS Tester",
+        "id": "tester",
+        "options": {}
       }
     },
     "example": {
