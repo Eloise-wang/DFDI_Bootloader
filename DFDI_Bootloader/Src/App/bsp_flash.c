@@ -12,6 +12,7 @@
 
 #include "bsp_flash.h"
 #include "device_status.h"
+#include "includes.h"
 
 /*******************************************************************************
  * 内部变量
@@ -109,6 +110,8 @@ static boolean BSP_Flash_Hal_EraseSector(const uint32_t startAddr, const uint32_
 
     if (!g_bFlashInit)
     {
+        Debug_Printf("BSP_Flash_Hal_EraseSector: flash not init, addr=0x%08lX count=%lu\n",
+                     startAddr, sectorCount);
         return FALSE;
     }
 
@@ -118,6 +121,10 @@ static boolean BSP_Flash_Hal_EraseSector(const uint32_t startAddr, const uint32_
         status = FLASH_DRV_EraseSector(&g_flashConfig, startAddr + i * PFLASH_PAGE_SIZE, PFLASH_PAGE_SIZE);
         if (status != STATUS_SUCCESS)
         {
+            Debug_Printf("BSP_Flash_Hal_EraseSector: erase failed, addr=0x%08lX status=%d count=%lu\n",
+                         startAddr + i * PFLASH_PAGE_SIZE,
+                         status,
+                         sectorCount);
             return FALSE;
         }
     }

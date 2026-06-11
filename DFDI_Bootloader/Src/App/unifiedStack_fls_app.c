@@ -304,6 +304,14 @@ do{\
 
      Flash_SetFlashDriverDowload();
      (void)BSP_Flash_RegisterAPI(&gs_stFlashDownloadInfo.stFlashOperateAPI);
+    if(NULL_PTR != gs_stFlashDownloadInfo.stFlashOperateAPI.pfFlashInit)
+    {
+        if(TRUE != gs_stFlashDownloadInfo.stFlashOperateAPI.pfFlashInit())
+        {
+            FLS_DebugPrintf("%s: flash init failed!\n", __func__);
+            Flash_SetFlashDriverNotDonwload();
+        }
+    }
  }
  
  /*flash app module init*/
@@ -327,6 +335,14 @@ do{\
 
      Flash_SetFlashDriverDowload();
      (void)BSP_Flash_RegisterAPI(&gs_stFlashDownloadInfo.stFlashOperateAPI);
+    if(NULL_PTR != gs_stFlashDownloadInfo.stFlashOperateAPI.pfFlashInit)
+    {
+        if(TRUE != gs_stFlashDownloadInfo.stFlashOperateAPI.pfFlashInit())
+        {
+            FLS_DebugPrintf("%s: flash init failed!\n", __func__);
+            Flash_SetFlashDriverNotDonwload();
+        }
+    }
  }
  
  /*flash operate main function*/
@@ -558,6 +574,7 @@ do{\
      /*check flash driver valid or not?*/
      if(TRUE != Flash_IsFlashDriverDownload())
      {
+        FLS_DebugPrintf("%s: flash driver is not ready!\n", __func__);
          return FALSE;
      }
  
@@ -568,6 +585,7 @@ do{\
          case START_ERASE_FLASH:	
              /*get old app type*/
              s_appType = Flash_GetOldAPPType();
+            FLS_DebugPrintf("%s: start erase, oldAPPType=%d\n", __func__, s_appType);
  
              s_pAppFlashMemoryInfo = NULL_PTR;
              s_appFlashItem = 0u;
@@ -578,8 +596,13 @@ do{\
              /*get old app type flash config*/
              if(TRUE == BSP_Flash_GetConfigInfo(s_appType, &s_pAppFlashMemoryInfo, &s_appFlashItem))
              {
+                FLS_DebugPrintf("%s: cfg ok, blockCnt=%lu\n", __func__, s_appFlashItem);
                  Flash_SetEraseFlashStep(DO_ERASING_FLASH);
              }
+            else
+            {
+                FLS_DebugPrintf("%s: BSP_Flash_GetConfigInfo failed, appType=%d\n", __func__, s_appType);
+            }
              
              break;
  
@@ -587,6 +610,8 @@ do{\
          case DO_ERASING_FLASH:
              /*get total sectors*/
              totalSectors = BSP_Flash_GetTotalSectors(s_appType);						
+            FLS_DebugPrintf("%s: erase begin, appType=%d totalSectors=%lu maxEraseSectors=%lu\n",
+                            __func__, s_appType, totalSectors, maxEraseSectors);
  
              /*one time erase all flash sectors*/
              if(totalSectors <= maxEraseSectors)
@@ -600,6 +625,11 @@ do{\
                      BSP_WATCHDOG_Feed();
                  
                      sectorNo = BSP_Flash_LengthToSectors(s_pAppFlashMemoryInfo->xBlockStartLogicalAddr, eraseFlashLen);					
+                    FLS_DebugPrintf("%s: erase block start=0x%08lX end=0x%08lX sectors=%lu\n",
+                                    __func__,
+                                    s_pAppFlashMemoryInfo->xBlockStartLogicalAddr,
+                                    s_pAppFlashMemoryInfo->xBlockEndLogicalAddr,
+                                    sectorNo);
                  
                      if(NULL_PTR != gs_stFlashDownloadInfo.stFlashOperateAPI.pfEraserSecotr)
                      {
@@ -622,6 +652,8 @@ do{\
                              eraseSectorNoTmp--;
                              if(TRUE != s_result)
                              {
+                                FLS_DebugPrintf("%s: erase sector failed, addr=0x%08lX remain=%lu\n",
+                                                __func__, eraseFlashStartAddr, eraseSectorNoTmp);
                                  break;
                              }
  
@@ -634,10 +666,13 @@ do{\
                      else
                      {
                          s_result = FALSE;
+                        FLS_DebugPrintf("%s: pfEraserSecotr is NULL\n", __func__);
                      }
                      
                      if(TRUE != s_result)
                      {					
+                        FLS_DebugPrintf("%s: erase block failed, appType=%d erasedSectors=%lu\n",
+                                        __func__, s_appType, s_eraseSectorsCnt);
                          break;
                      }
  
@@ -659,6 +694,8 @@ do{\
                      if(TRUE != BSP_Flash_SectorNumberToAddress(s_appType, s_eraseSectorsCnt, &eraseFlashStartAddr))
                      {
                          s_result = FALSE;
+                        FLS_DebugPrintf("%s: SectorNumberToAddress failed, appType=%d sectorIndex=%lu\n",
+                                        __func__, s_appType, s_eraseSectorsCnt);
                          
                          break;
                      }
@@ -674,6 +711,11 @@ do{\
                      else
                      {
                          s_result = FALSE;
+                        FLS_DebugPrintf("%s: erase addr invalid, addr=0x%08lX blockStart=0x%08lX blockEnd=0x%08lX\n",
+                                        __func__,
+                                        eraseFlashStartAddr,
+                                        s_pAppFlashMemoryInfo->xBlockStartLogicalAddr,
+                                        s_pAppFlashMemoryInfo->xBlockEndLogicalAddr);
  
                          break;
                      }
@@ -686,6 +728,13 @@ do{\
  
                      /*calculate flash length to sectors*/					
                      sectorNo = BSP_Flash_LengthToSectors(eraseFlashStartAddr, eraseFlashLen);
+                    FLS_DebugPrintf("%s: erase chunk start=0x%08lX len=0x%08lX sectors=%lu erased=%lu/%lu\n",
+                                    __func__,
+                                    eraseFlashStartAddr,
+                                    eraseFlashLen,
+                                    sectorNo,
+                                    s_eraseSectorsCnt,
+                                    totalSectors);
                      if(sectorNo > maxEraseSectors)
                      {
                          sectorNo = maxEraseSectors;
@@ -727,6 +776,8 @@ do{\
                              eraseSectorNoTmp--;
                              if(TRUE != s_result)
                              {
+                                FLS_DebugPrintf("%s: erase sector failed, addr=0x%08lX remain=%lu\n",
+                                                __func__, eraseFlashStartAddr, eraseSectorNoTmp);
                                  break;
                              }
  
@@ -740,10 +791,13 @@ do{\
                      else
                      {
                          s_result = FALSE;
+                        FLS_DebugPrintf("%s: pfEraserSecotr is NULL\n", __func__);
                      }
                      
                      if(TRUE != s_result)
                      {
+                        FLS_DebugPrintf("%s: erase chunk failed, appType=%d erasedSectors=%lu/%lu\n",
+                                        __func__, s_appType, s_eraseSectorsCnt, totalSectors);
                          break;
                      }
  
@@ -770,6 +824,8 @@ do{\
                  /*request more time from host*/
                  if(NULL_PTR != gs_stFlashDownloadInfo.pfRequestMoreTime)
                  {
+                    FLS_DebugPrintf("%s: request more time, erasedSectors=%lu/%lu\n",
+                                    __func__, s_eraseSectorsCnt, totalSectors);
                      gs_stFlashDownloadInfo.pfRequestMoreTime(gs_stFlashDownloadInfo.requestActiveJobUDSSerID, RequetMoreTimeSuccessfulFromHost);
                  }
              }
@@ -780,12 +836,16 @@ do{\
                      Flash_SetAPPStatus(TRUE, FALSE, TRUE);
  
                      Flash_SetAPPTypeErased(s_appType);
+                    FLS_DebugPrintf("%s: erase success, appType=%d totalSectors=%lu\n",
+                                    __func__, s_appType, totalSectors);
                  }
                  else
                  {
                      Flash_SetAPPStatus(FALSE, FALSE, TRUE);
  
                      Flash_ClearAPPTypeErased(s_appType);
+                    FLS_DebugPrintf("%s: erase failed, appType=%d result=%d erasedSectors=%lu/%lu\n",
+                                    __func__, s_appType, s_result, s_eraseSectorsCnt, totalSectors);
                  }
  
                  Flash_CreateAndSaveAppStatusCrc(&xCountCrc);

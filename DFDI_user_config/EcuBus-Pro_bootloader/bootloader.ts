@@ -6,6 +6,7 @@ import fs from 'fs/promises'
 const crc = new CRC('self', 16, 0x3d65, 0, 0xffff, true, true)
 let maxChunkSize: number | undefined = undefined
 let content: undefined | Buffer = undefined
+let pendingCrcResult: number | undefined = undefined
 const fileList: {
   addr: number
   file: string
@@ -26,6 +27,33 @@ Util.Init(async () => {
   await resp.changeService()
 })
 
+Util.On('Tester_1.RoutineControl491.recv', (v) => {
+  const raw = v.diagGetRaw()
+  if (v.diagIsPositiveResponse()) {
+    console.log(`[BOOTLOADER] RC491 resp+: ${raw.toString('hex').toUpperCase()}`)
+  } else {
+    console.log(`[BOOTLOADER] RC491 resp-: NRC=0x${v.diagGetResponseCode().toString(16)} raw=${raw.toString('hex').toUpperCase()}`)
+  }
+})
+
+Util.On('Tester_1.RoutineControl490.recv', (v) => {
+  const raw = v.diagGetRaw()
+  if (v.diagIsPositiveResponse()) {
+    console.log(`[BOOTLOADER] RC490 resp+: ${raw.toString('hex').toUpperCase()}`)
+  } else {
+    console.log(`[BOOTLOADER] RC490 resp-: NRC=0x${v.diagGetResponseCode().toString(16)} raw=${raw.toString('hex').toUpperCase()}`)
+  }
+})
+
+Util.On('Tester_1.RequestDownload520.recv', (v) => {
+  const raw = v.diagGetRaw()
+  if (v.diagIsPositiveResponse()) {
+    console.log(`[BOOTLOADER] R34 resp+: ${raw.toString('hex').toUpperCase()}`)
+  } else {
+    console.log(`[BOOTLOADER] R34 resp-: NRC=0x${v.diagGetResponseCode().toString(16)} raw=${raw.toString('hex').toUpperCase()}`)
+  }
+})
+
 Util.On('Tester_1.SecurityAccess390.recv', async (v) => {
   const data = v.diagGetParameterRaw('securitySeed')
   const cipher = crypto.createCipheriv(
@@ -44,23 +72,39 @@ Util.On('Tester_1.SecurityAccess390.recv', async (v) => {
 Util.Register('Tester_1.JobFunction0', async () => {
   const item = fileList.shift()
   if (item) {
+    console.log(`[BOOTLOADER] start job: addr=0x${item.addr.toString(16)} file=${item.file}`)
+    const list = []
+
     const r34 = DiagRequest.from('Tester_1.RequestDownload520')
     const memoryAddress = Buffer.alloc(4)
     memoryAddress.writeUInt32BE(item.addr)
     r34.diagSetParameterRaw('memoryAddress', memoryAddress)
     content = await fs.readFile(item.file)
+    console.log(`[BOOTLOADER] file size=${content.length}`)
     const crcResult = crc.compute(content)
-    const crcReq = DiagRequest.from('Tester_1.RoutineControl490')
-    const crcBuffer = Buffer.alloc(4)
-    crcBuffer.writeUInt16BE(crcResult, 2)
-    crcReq.diagSetParameterSize('routineControlOptionRecord', 4 * 8)
-    crcReq.diagSetParameterRaw('routineControlOptionRecord', crcBuffer)
-    await crcReq.changeService()
+    pendingCrcResult = crcResult
+
+    const eraseReq = DiagRequest.from('Tester_1.RoutineControl491')
+    eraseReq.diagSetParameter('routineIdentifier', 0xff00)
+    eraseReq.diagSetParameterSize('routineControlOptionRecord', 0)
+    console.log('[BOOTLOADER] erase: routine=0xFF00')
+    list.push(eraseReq)
+
     r34.diagSetParameter('memorySize', content.length)
     r34.On('recv', (resp) => {
-      maxChunkSize = resp.diagGetParameterRaw('maxNumberOfBlockLength').readUint8(0)
+      const buf = resp.diagGetParameterRaw('maxNumberOfBlockLength')
+      const hex = buf.toString('hex').toUpperCase()
+      if (buf.length >= 2) {
+        maxChunkSize = buf.readUInt16BE(0)
+      } else if (buf.length === 1) {
+        maxChunkSize = buf.readUInt8(0)
+      } else {
+        maxChunkSize = undefined
+      }
+      console.log(`[BOOTLOADER] maxNumberOfBlockLength raw=${hex} val=${maxChunkSize}`)
     })
-    return [r34]
+    list.push(r34)
+    return list
   } else {
     return []
   }
@@ -96,18 +140,25 @@ Util.Register('Tester_1.JobFunction1', () => {
     const r37 = DiagRequest.from('Tester_1.RequestTransferExit550')
     r37.diagSetParameterSize('transferRequestParameterRecord', 0)
     list.push(r37)
-    r37.On('recv', async () => {
-      if (fileList.length == 0) {
-        const req = DiagRequest.from('Tester_1.RoutineControl491')
-        req.diagSetParameter('routineIdentifier', 0xff01)
-        await req.changeService()
-        const resp = DiagResponse.from('Tester_1.RoutineControl491')
-        resp.diagSetParameter('routineIdentifier', 0xff01)
-        await resp.changeService()
-      }
-    })
+    if (pendingCrcResult != undefined) {
+      const crcReq = DiagRequest.from('Tester_1.RoutineControl490')
+      const crcBuffer = Buffer.alloc(4)
+      crcBuffer.writeUInt16BE(pendingCrcResult, 2)
+      crcReq.diagSetParameterSize('routineControlOptionRecord', 4 * 8)
+      crcReq.diagSetParameterRaw('routineControlOptionRecord', crcBuffer)
+      console.log(`[BOOTLOADER] checksum: crc=0x${pendingCrcResult.toString(16)}`)
+      list.push(crcReq)
+    }
+    if (fileList.length == 0) {
+      const dependencyReq = DiagRequest.from('Tester_1.RoutineControl491')
+      dependencyReq.diagSetParameter('routineIdentifier', 0xff01)
+      dependencyReq.diagSetParameterSize('routineControlOptionRecord', 0)
+      console.log('[BOOTLOADER] dependency: routine=0xFF01')
+      list.push(dependencyReq)
+    }
     content = undefined
     maxChunkSize = undefined
+    pendingCrcResult = undefined
     return list
   } else {
     return []
