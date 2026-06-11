@@ -8059,16 +8059,64 @@ var import_crypto = __toESM(require("crypto"));
 var import_ECB2 = __toESM(require_js());
 var import_path = __toESM(require("path"));
 var import_promises = __toESM(require("fs/promises"));
+var PACKAGE_MAGIC = "DFPK";
+var PACKAGE_VERSION = 1;
+var PACKAGE_HEADER_SIZE = 12;
 var crc = new import_ECB2.CRC("self", 16, 15717, 0, 65535, true, true);
 var maxChunkSize = void 0;
 var content = void 0;
 var pendingCrcResult = void 0;
-var fileList = [
-  {
-    addr: 65536,
-    file: import_path.default.join(process.env.PROJECT_ROOT, "bin", "DFDI_APP.bin")
+var currentPackage = void 0;
+var currentImage = void 0;
+var fileList = [import_path.default.join(process.env.PROJECT_ROOT, "bin", "DFDI_APP.bin")];
+function sha256Of(data) {
+  return import_crypto.default.createHash("sha256").update(data).digest("hex");
+}
+function parseUpgradePackage(filePath, raw) {
+  if (raw.length < PACKAGE_HEADER_SIZE) {
+    throw new Error(`upgrade package too small: ${filePath}`);
   }
-];
+  const magic = raw.subarray(0, 4).toString("ascii");
+  if (magic !== PACKAGE_MAGIC) {
+    throw new Error(`invalid package magic: ${magic}`);
+  }
+  const version = raw.readUInt32BE(4);
+  if (version !== PACKAGE_VERSION) {
+    throw new Error(`unsupported package version: ${version}`);
+  }
+  const manifestLength = raw.readUInt32BE(8);
+  const manifestStart = PACKAGE_HEADER_SIZE;
+  const manifestEnd = manifestStart + manifestLength;
+  if (manifestEnd > raw.length) {
+    throw new Error(`manifest length out of range: ${manifestLength}`);
+  }
+  const manifest = JSON.parse(raw.subarray(manifestStart, manifestEnd).toString("utf8"));
+  if (manifest.format !== PACKAGE_MAGIC || manifest.version !== PACKAGE_VERSION || !Array.isArray(manifest.images)) {
+    throw new Error("invalid manifest content");
+  }
+  for (const image of manifest.images) {
+    const dataEnd = image.dataOffset + image.dataSize;
+    if (dataEnd > raw.length) {
+      throw new Error(`image ${image.slotName} exceeds package size`);
+    }
+  }
+  return { manifest, raw, filePath };
+}
+function getImageBySlot(pkg, slotType) {
+  const image = pkg.manifest.images.find((item) => item.slotType === slotType);
+  if (!image) {
+    throw new Error(`package does not contain slot ${slotType}`);
+  }
+  return image;
+}
+function loadImagePayload(pkg, image) {
+  const payload = pkg.raw.subarray(image.dataOffset, image.dataOffset + image.dataSize);
+  const calcSha256 = sha256Of(payload);
+  if (calcSha256.toLowerCase() !== image.sha256.toLowerCase()) {
+    throw new Error(`sha256 mismatch for slot ${image.slotName}`);
+  }
+  return payload;
+}
 Util.Init(async () => {
   const req = import_ECB2.DiagRequest.from("Tester_1.RoutineControl491");
   req.diagSetParameter("routineControlType", 1);
@@ -8081,6 +8129,9 @@ Util.On("Tester_1.RoutineControl491.recv", (v) => {
   const raw = v.diagGetRaw();
   if (v.diagIsPositiveResponse()) {
     console.log(`[BOOTLOADER] RC491 resp+: ${raw.toString("hex").toUpperCase()}`);
+    if (raw.length >= 6 && raw[0] === 113 && raw[1] === 1 && raw[2] === 255 && raw[3] === 0) {
+      console.log(`[BOOTLOADER] erase result=${raw[4]} targetSlot=${raw[5]}`);
+    }
   } else {
     console.log(`[BOOTLOADER] RC491 resp-: NRC=0x${v.diagGetResponseCode().toString(16)} raw=${raw.toString("hex").toUpperCase()}`);
   }
@@ -8116,24 +8167,49 @@ Util.On("Tester_1.SecurityAccess390.recv", async (v) => {
   await req.changeService();
 });
 Util.Register("Tester_1.JobFunction0", async () => {
-  const item = fileList.shift();
-  if (item) {
-    console.log(`[BOOTLOADER] start job: addr=0x${item.addr.toString(16)} file=${item.file}`);
+  const filePath = fileList.shift();
+  if (filePath) {
+    currentPackage = parseUpgradePackage(filePath, await import_promises.default.readFile(filePath));
+    console.log(`[BOOTLOADER] start job: package=${currentPackage.filePath}`);
+    console.log(`[BOOTLOADER] package images=${currentPackage.manifest.images.length}`);
     const list = [];
     const r34 = import_ECB2.DiagRequest.from("Tester_1.RequestDownload520");
-    const memoryAddress = Buffer.alloc(4);
-    memoryAddress.writeUInt32BE(item.addr);
-    r34.diagSetParameterRaw("memoryAddress", memoryAddress);
-    content = await import_promises.default.readFile(item.file);
-    console.log(`[BOOTLOADER] file size=${content.length}`);
-    const crcResult = crc.compute(content);
-    pendingCrcResult = crcResult;
+    content = void 0;
+    currentImage = void 0;
+    pendingCrcResult = void 0;
     const eraseReq = import_ECB2.DiagRequest.from("Tester_1.RoutineControl491");
     eraseReq.diagSetParameter("routineIdentifier", 65280);
     eraseReq.diagSetParameterSize("routineControlOptionRecord", 0);
     console.log("[BOOTLOADER] erase: routine=0xFF00");
+    eraseReq.On("recv", (resp) => {
+      const raw = resp.diagGetRaw();
+      if (!resp.diagIsPositiveResponse()) {
+        return;
+      }
+      if (raw.length < 6 || raw[0] !== 113 || raw[1] !== 1 || raw[2] !== 255 || raw[3] !== 0) {
+        return;
+      }
+      if (raw[4] !== 0) {
+        throw new Error(`erase routine failed, status=${raw[4]}`);
+      }
+      const targetSlot = raw[5];
+      currentImage = getImageBySlot(currentPackage, targetSlot);
+      content = loadImagePayload(currentPackage, currentImage);
+      pendingCrcResult = crc.compute(content);
+      if (pendingCrcResult !== currentImage.crc16) {
+        throw new Error(
+          `package crc16 mismatch for slot ${currentImage.slotName}: manifest=0x${currentImage.crc16.toString(16)} calc=0x${pendingCrcResult.toString(16)}`
+        );
+      }
+      const memoryAddress = Buffer.alloc(4);
+      memoryAddress.writeUInt32BE(currentImage.loadAddress);
+      r34.diagSetParameterRaw("memoryAddress", memoryAddress);
+      r34.diagSetParameter("memorySize", content.length);
+      console.log(
+        `[BOOTLOADER] selected slot=${currentImage.slotName} addr=0x${currentImage.loadAddress.toString(16)} size=${content.length} crc=0x${pendingCrcResult.toString(16)}`
+      );
+    });
     list.push(eraseReq);
-    r34.diagSetParameter("memorySize", content.length);
     r34.On("recv", (resp) => {
       const buf = resp.diagGetParameterRaw("maxNumberOfBlockLength");
       const hex = buf.toString("hex").toUpperCase();
@@ -8195,6 +8271,8 @@ Util.Register("Tester_1.JobFunction1", () => {
       list.push(dependencyReq);
     }
     content = void 0;
+    currentImage = void 0;
+    currentPackage = void 0;
     maxChunkSize = void 0;
     pendingCrcResult = void 0;
     return list;

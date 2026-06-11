@@ -1414,6 +1414,7 @@
      uint8 aResponseBuf[8u] = {0u};
      uint8 TxDataLen = 0u;
      tUdsId UdsTxId = 0u;
+    tAPPType targetAPPType = Flash_GetTargetAPPType();
  
      TxDataLen = sizeof(gs_aEraseMemoryRoutineControlId) / sizeof(gs_aEraseMemoryRoutineControlId[0u]);
      aResponseBuf[0u] = gs_aEraseMemoryRoutineControlId[0u] + 0x40u;
@@ -1433,6 +1434,9 @@
      }
  
      TxDataLen++;
+
+    aResponseBuf[TxDataLen] = (uint8)targetAPPType;
+    TxDataLen++;
  
      UdsTxId = TP_GetConfigTxMsgID();
  

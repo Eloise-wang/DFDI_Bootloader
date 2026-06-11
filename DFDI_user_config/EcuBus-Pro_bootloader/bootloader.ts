@@ -3,19 +3,99 @@ import { CRC, DiagRequest, DiagResponse } from 'ECB'
 import path from 'path'
 import fs from 'fs/promises'
 
+const PACKAGE_MAGIC = 'DFPK'
+const PACKAGE_VERSION = 1
+const PACKAGE_HEADER_SIZE = 12
+const SLOT_A = 0
+const SLOT_B = 1
+
+type PackageImage = {
+  slotType: number
+  slotName: string
+  loadAddress: number
+  dataOffset: number
+  dataSize: number
+  crc16: number
+  sha256: string
+}
+
+type PackageManifest = {
+  format: typeof PACKAGE_MAGIC
+  version: number
+  images: PackageImage[]
+}
+
+type UpgradePackage = {
+  manifest: PackageManifest
+  raw: Buffer
+  filePath: string
+}
+
 const crc = new CRC('self', 16, 0x3d65, 0, 0xffff, true, true)
 let maxChunkSize: number | undefined = undefined
 let content: undefined | Buffer = undefined
 let pendingCrcResult: number | undefined = undefined
-const fileList: {
-  addr: number
-  file: string
-}[] = [
-  {
-    addr: 0x00010000,
-    file: path.join(process.env.PROJECT_ROOT, 'bin', 'DFDI_APP.bin')
+let currentPackage: UpgradePackage | undefined = undefined
+let currentImage: PackageImage | undefined = undefined
+const fileList: string[] = [path.join(process.env.PROJECT_ROOT, 'bin', 'DFDI_APP.bin')]
+
+function sha256Of(data: Buffer): string {
+  return crypto.createHash('sha256').update(data).digest('hex')
+}
+
+function parseUpgradePackage(filePath: string, raw: Buffer): UpgradePackage {
+  if (raw.length < PACKAGE_HEADER_SIZE) {
+    throw new Error(`upgrade package too small: ${filePath}`)
   }
-]
+
+  const magic = raw.subarray(0, 4).toString('ascii')
+  if (magic !== PACKAGE_MAGIC) {
+    throw new Error(`invalid package magic: ${magic}`)
+  }
+
+  const version = raw.readUInt32BE(4)
+  if (version !== PACKAGE_VERSION) {
+    throw new Error(`unsupported package version: ${version}`)
+  }
+
+  const manifestLength = raw.readUInt32BE(8)
+  const manifestStart = PACKAGE_HEADER_SIZE
+  const manifestEnd = manifestStart + manifestLength
+  if (manifestEnd > raw.length) {
+    throw new Error(`manifest length out of range: ${manifestLength}`)
+  }
+
+  const manifest = JSON.parse(raw.subarray(manifestStart, manifestEnd).toString('utf8')) as PackageManifest
+  if (manifest.format !== PACKAGE_MAGIC || manifest.version !== PACKAGE_VERSION || !Array.isArray(manifest.images)) {
+    throw new Error('invalid manifest content')
+  }
+
+  for (const image of manifest.images) {
+    const dataEnd = image.dataOffset + image.dataSize
+    if (dataEnd > raw.length) {
+      throw new Error(`image ${image.slotName} exceeds package size`)
+    }
+  }
+
+  return { manifest, raw, filePath }
+}
+
+function getImageBySlot(pkg: UpgradePackage, slotType: number): PackageImage {
+  const image = pkg.manifest.images.find((item) => item.slotType === slotType)
+  if (!image) {
+    throw new Error(`package does not contain slot ${slotType}`)
+  }
+  return image
+}
+
+function loadImagePayload(pkg: UpgradePackage, image: PackageImage): Buffer {
+  const payload = pkg.raw.subarray(image.dataOffset, image.dataOffset + image.dataSize)
+  const calcSha256 = sha256Of(payload)
+  if (calcSha256.toLowerCase() !== image.sha256.toLowerCase()) {
+    throw new Error(`sha256 mismatch for slot ${image.slotName}`)
+  }
+  return payload
+}
 
 Util.Init(async () => {
   //change routineControlType
@@ -31,6 +111,9 @@ Util.On('Tester_1.RoutineControl491.recv', (v) => {
   const raw = v.diagGetRaw()
   if (v.diagIsPositiveResponse()) {
     console.log(`[BOOTLOADER] RC491 resp+: ${raw.toString('hex').toUpperCase()}`)
+    if (raw.length >= 6 && raw[0] === 0x71 && raw[1] === 0x01 && raw[2] === 0xff && raw[3] === 0x00) {
+      console.log(`[BOOTLOADER] erase result=${raw[4]} targetSlot=${raw[5]}`)
+    }
   } else {
     console.log(`[BOOTLOADER] RC491 resp-: NRC=0x${v.diagGetResponseCode().toString(16)} raw=${raw.toString('hex').toUpperCase()}`)
   }
@@ -70,27 +153,54 @@ Util.On('Tester_1.SecurityAccess390.recv', async (v) => {
 })
 
 Util.Register('Tester_1.JobFunction0', async () => {
-  const item = fileList.shift()
-  if (item) {
-    console.log(`[BOOTLOADER] start job: addr=0x${item.addr.toString(16)} file=${item.file}`)
+  const filePath = fileList.shift()
+  if (filePath) {
+    currentPackage = parseUpgradePackage(filePath, await fs.readFile(filePath))
+    console.log(`[BOOTLOADER] start job: package=${currentPackage.filePath}`)
+    console.log(`[BOOTLOADER] package images=${currentPackage.manifest.images.length}`)
     const list = []
 
     const r34 = DiagRequest.from('Tester_1.RequestDownload520')
-    const memoryAddress = Buffer.alloc(4)
-    memoryAddress.writeUInt32BE(item.addr)
-    r34.diagSetParameterRaw('memoryAddress', memoryAddress)
-    content = await fs.readFile(item.file)
-    console.log(`[BOOTLOADER] file size=${content.length}`)
-    const crcResult = crc.compute(content)
-    pendingCrcResult = crcResult
+    content = undefined
+    currentImage = undefined
+    pendingCrcResult = undefined
 
     const eraseReq = DiagRequest.from('Tester_1.RoutineControl491')
     eraseReq.diagSetParameter('routineIdentifier', 0xff00)
     eraseReq.diagSetParameterSize('routineControlOptionRecord', 0)
     console.log('[BOOTLOADER] erase: routine=0xFF00')
+    eraseReq.On('recv', (resp) => {
+      const raw = resp.diagGetRaw()
+      if (!resp.diagIsPositiveResponse()) {
+        return
+      }
+      if (raw.length < 6 || raw[0] !== 0x71 || raw[1] !== 0x01 || raw[2] !== 0xff || raw[3] !== 0x00) {
+        return
+      }
+      if (raw[4] !== 0x00) {
+        throw new Error(`erase routine failed, status=${raw[4]}`)
+      }
+      const targetSlot = raw[5]
+      currentImage = getImageBySlot(currentPackage!, targetSlot)
+      content = loadImagePayload(currentPackage!, currentImage)
+      pendingCrcResult = crc.compute(content)
+      if (pendingCrcResult !== currentImage.crc16) {
+        throw new Error(
+          `package crc16 mismatch for slot ${currentImage.slotName}: manifest=0x${currentImage.crc16.toString(16)} calc=0x${pendingCrcResult.toString(16)}`
+        )
+      }
+
+      const memoryAddress = Buffer.alloc(4)
+      memoryAddress.writeUInt32BE(currentImage.loadAddress)
+      r34.diagSetParameterRaw('memoryAddress', memoryAddress)
+      r34.diagSetParameter('memorySize', content.length)
+
+      console.log(
+        `[BOOTLOADER] selected slot=${currentImage.slotName} addr=0x${currentImage.loadAddress.toString(16)} size=${content.length} crc=0x${pendingCrcResult.toString(16)}`
+      )
+    })
     list.push(eraseReq)
 
-    r34.diagSetParameter('memorySize', content.length)
     r34.On('recv', (resp) => {
       const buf = resp.diagGetParameterRaw('maxNumberOfBlockLength')
       const hex = buf.toString('hex').toUpperCase()
@@ -157,6 +267,8 @@ Util.Register('Tester_1.JobFunction1', () => {
       list.push(dependencyReq)
     }
     content = undefined
+    currentImage = undefined
+    currentPackage = undefined
     maxChunkSize = undefined
     pendingCrcResult = undefined
     return list

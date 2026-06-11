@@ -129,6 +129,9 @@ typedef struct
  
  /*flash download info*/
  static tFlsDownloadStateType gs_stFlashDownloadInfo;
+
+/* Latched target slot for the current upgrade session. */
+static tAPPType gs_eTargetAPPType = APP_INVLID_TYPE;
  
  /*erase flash status.*/
  static tEraseFlashStep gs_eEraseFlashStep = START_ERASE_FLASH;
@@ -302,6 +305,8 @@ do{\
 
      fsl_memset(&gs_stAppFlashStatus, 0xFFu, sizeof(tAppFlashStatus));
 
+    gs_eTargetAPPType = APP_INVLID_TYPE;
+
      Flash_SetFlashDriverDowload();
      (void)BSP_Flash_RegisterAPI(&gs_stFlashDownloadInfo.stFlashOperateAPI);
     if(NULL_PTR != gs_stFlashDownloadInfo.stFlashOperateAPI.pfFlashInit)
@@ -332,6 +337,8 @@ do{\
      fsl_memset(&gs_stFlashDownloadInfo.stFlashOperateAPI, 0x0u, sizeof(tFlashOperateAPI));
 
      fsl_memset(&gs_stAppFlashStatus, 0xFFu, sizeof(tAppFlashStatus));
+
+    gs_eTargetAPPType = APP_INVLID_TYPE;
 
      Flash_SetFlashDriverDowload();
      (void)BSP_Flash_RegisterAPI(&gs_stFlashDownloadInfo.stFlashOperateAPI);
@@ -585,6 +592,7 @@ do{\
          case START_ERASE_FLASH:	
              /*get old app type*/
              s_appType = Flash_GetOldAPPType();
+            gs_eTargetAPPType = s_appType;
             FLS_DebugPrintf("%s: start erase, oldAPPType=%d\n", __func__, s_appType);
  
              s_pAppFlashMemoryInfo = NULL_PTR;
@@ -1704,6 +1712,11 @@ uint8 Flash_IsReadAppInfoFromFlashValid(void)
      return oldAPP;
  #endif	/*#ifndef EN_SUPPORT_APP_B*/
  }
+
+tAPPType Flash_GetTargetAPPType(void)
+{
+    return gs_eTargetAPPType;
+}
  
  /*Is valid address?*/
  boolean Flash_IsValidAddr(const tAPPType i_appType, const uint32 i_dataAddr, const uint32 i_dataLen)

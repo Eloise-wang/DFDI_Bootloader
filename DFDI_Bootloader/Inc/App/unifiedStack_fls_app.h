@@ -119,6 +119,9 @@
  
  /*获得旧的APP信息*/
  extern tAPPType Flash_GetOldAPPType(void);
+
+/* 获取当前升级目标槽位（在一次擦除/下载流程中保持稳定） */
+extern tAPPType Flash_GetTargetAPPType(void);
  
  /*get rest hander address*/
  extern uint32 Flash_GetResetHandlerAddr(void);
