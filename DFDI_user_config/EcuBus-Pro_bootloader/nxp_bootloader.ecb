@@ -125,28 +125,6 @@
               },
               {
                 "enable": true,
-                "checkResp": true,
-                "retryNum": 0,
-                "addressIndex": 0,
-                "failBehavior": "stop",
-                "serviceId": "cb7b3449-1ae6-46df-882a-d99b165aa733",
-                "delay": 50,
-                "_X_ROW_KEY": "row_270",
-                "uuid": "row_14"
-              },
-              {
-                "enable": true,
-                "checkResp": true,
-                "retryNum": 0,
-                "addressIndex": 0,
-                "failBehavior": "stop",
-                "serviceId": "99277238-41eb-48d6-9ccc-ffc7dbddd28a",
-                "delay": 50,
-                "_X_ROW_KEY": "row_353",
-                "uuid": "row_15"
-              },
-              {
-                "enable": true,
                 "checkResp": false,
                 "retryNum": 0,
                 "addressIndex": 0,
@@ -166,28 +144,6 @@
                 "delay": 50,
                 "_X_ROW_KEY": "row_158",
                 "uuid": "row_17"
-              },
-              {
-                "enable": true,
-                "checkResp": true,
-                "retryNum": 0,
-                "addressIndex": 0,
-                "failBehavior": "stop",
-                "serviceId": "cb7b3449-1ae6-46df-882a-d99b165aa733",
-                "delay": 50,
-                "_X_ROW_KEY": "row_43",
-                "uuid": "row_18"
-              },
-              {
-                "enable": true,
-                "checkResp": true,
-                "retryNum": 0,
-                "addressIndex": 0,
-                "failBehavior": "stop",
-                "serviceId": "99277238-41eb-48d6-9ccc-ffc7dbddd28a",
-                "delay": 50,
-                "_X_ROW_KEY": "row_44",
-                "uuid": "row_19"
               },
               {
                 "enable": true,
@@ -1013,14 +969,17 @@
                   "bitLen": 8,
                   "deletable": true,
                   "editable": true,
-                  "type": "NUM",
+                  "type": "ARRAY",
                   "value": {
                     "type": "Buffer",
                     "data": [
+                      0,
+                      0,
+                      0,
                       0
                     ]
                   },
-                  "phyValue": "00"
+                  "phyValue": "00000000"
                 }
               ],
               "respParams": [

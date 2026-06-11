@@ -134,6 +134,11 @@ Util.On('Tester_1.RoutineControl490.recv', (v) => {
   const raw = v.diagGetRaw()
   if (v.diagIsPositiveResponse()) {
     console.log(`[BOOTLOADER] RC490 resp+: ${raw.toString('hex').toUpperCase()}`)
+    if (raw.length >= 5 && raw[0] === 0x71 && raw[1] === 0x01 && raw[2] === 0x02 && raw[3] === 0x02) {
+      if (raw[4] !== 0x00) {
+        throw new Error(`checksum routine failed, status=${raw[4]}`)
+      }
+    }
   } else {
     console.log(`[BOOTLOADER] RC490 resp-: NRC=0x${v.diagGetResponseCode().toString(16)} raw=${raw.toString('hex').toUpperCase()}`)
   }
