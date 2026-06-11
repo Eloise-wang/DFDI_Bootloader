@@ -76,6 +76,8 @@ void APP_Demo_MainFun(void)
     /* Keep watchdog alive from the main loop even if the 100 ms timer tick is unavailable. */
     (void)BSP_WATCHDOG_Feed();
 
+    BSP_CAN_RxTask();
+
     if(TRUE == TIMER_HAL_Is1msTickTimeout())
     {
         TP_SystemTickCtl();
@@ -123,7 +125,11 @@ static void APP_SendMsgMainFun(void)
     if(TRUE == TP_DriverReadDataFromTP(sizeof(gs_au8MsgBuf), &gs_au8MsgBuf[0u], &gs_u32MsgId, &gs_u32MsgLength))
     {
         /* Transmit via CAN */
-        if(STATUS_SUCCESS != BSP_CAN_Transmit(gs_u32MsgId, (uint8_t)gs_u32MsgLength, gs_au8MsgBuf))
+        if(STATUS_SUCCESS == BSP_CAN_TransmitBlocking(gs_u32MsgId, (uint8_t)gs_u32MsgLength, gs_au8MsgBuf, 20U))
+        {
+            TP_DoTxMsgSuccesfulCallback();
+        }
+        else
         {
             APP_DebugPrintf("\nCAN Transmit failed!\n");
         }
@@ -132,6 +138,15 @@ static void APP_SendMsgMainFun(void)
 
 static void APP_BSP_Init(void)
 {
+    if (STATUS_SUCCESS != BSP_CAN_ClockInit())
+    {
+        APP_DebugPrintf("\nBSP_CAN_ClockInit failed!\n");
+        while (1)
+        {
+            __nop();
+        }
+    }
+
     /* Initialize BSP CAN peripheral */
     if(STATUS_SUCCESS != BSP_CAN_Init())
     {
