@@ -35,7 +35,9 @@ void Boot_JumpToAppOrNot(void)
 {
     uint32 resetHandlerAddr = 0u;
 
-    if ((TRUE == Boot_IsAPPValid()) && (TRUE != Boot_IsRequestEnterBootloader()))
+    if ((TRUE == Boot_IsAPPValid()) &&
+        (TRUE != Boot_IsRequestEnterBootloader()) &&
+        (TRUE != Boot_IsStayInBootloader()))
     {
         Boot_RemapApplication();
 
@@ -56,6 +58,7 @@ boolean Boot_CheckReqBootloaderMode(void)
     if (TRUE == Boot_IsRequestEnterBootloader())
     {
         Boot_ClearRequestEnterBootloaderFlag();
+        Boot_SetStayInBootloaderFlag();
 
         if (TRUE == UDS_TxMsgToHost())
         {

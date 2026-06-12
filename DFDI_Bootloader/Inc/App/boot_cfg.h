@@ -28,6 +28,15 @@ extern boolean Boot_IsRequestEnterBootloader(void);
 /*clear request enter bootloader flag*/
 extern void Boot_ClearRequestEnterBootloaderFlag(void);
 
+/*set stay in bootloader flag (survive reset)*/
+extern void Boot_SetStayInBootloaderFlag(void);
+
+/*clear stay in bootloader flag*/
+extern void Boot_ClearStayInBootloaderFlag(void);
+
+/*is stay in bootloader?*/
+extern boolean Boot_IsStayInBootloader(void);
+
 /*Jump to APP.*/
 extern void Boot_JumpToApp(const uint32 i_AppAddr);
 

@@ -21,18 +21,22 @@ typedef struct
     uint8 infoDataLen;
     uint8 requestEnterBootloader;
     uint8 downloadAPPSuccessful;
+    uint8 stayInBootloader;
     uint32 infoStartAddr;
     uint32 requestEnterBootloaderAddr;
     uint32 downloadAppSuccessfulAddr;
+    uint32 stayInBootloaderAddr;
 } tBootInfo;
 
 static const tBootInfo gs_stBootInfo = {
     16u,
     0x5Au,
     0xA5u,
+    0xC3u,
     0x20002FF0u,
     0x20002FF1u,
     0x20002FF0u,
+    0x20002FF2u,
 };
 
 #define GetInfoStorageCRC() (*(uint16 *)(gs_stBootInfo.infoStartAddr + 14u))
@@ -77,6 +81,7 @@ void Boot_SetDownloadAppSuccessful(void)
     uint32 infoCrc = 0u;
 
     *((uint8 *)gs_stBootInfo.downloadAppSuccessfulAddr) = gs_stBootInfo.downloadAPPSuccessful;
+    *((uint8 *)gs_stBootInfo.stayInBootloaderAddr) = 0u;
 
     infoCrc = Boot_CalculateInfoCRC();
     SetInforCRC(infoCrc);
@@ -105,6 +110,41 @@ void Boot_ClearRequestEnterBootloaderFlag(void)
 
     infoCrc = Boot_CalculateInfoCRC();
     SetInforCRC(infoCrc);
+}
+
+void Boot_SetStayInBootloaderFlag(void)
+{
+    uint32 infoCrc = 0u;
+
+    *((uint8 *)gs_stBootInfo.stayInBootloaderAddr) = gs_stBootInfo.stayInBootloader;
+
+    infoCrc = Boot_CalculateInfoCRC();
+    SetInforCRC(infoCrc);
+}
+
+void Boot_ClearStayInBootloaderFlag(void)
+{
+    uint32 infoCrc = 0u;
+
+    *((uint8 *)gs_stBootInfo.stayInBootloaderAddr) = 0u;
+
+    infoCrc = Boot_CalculateInfoCRC();
+    SetInforCRC(infoCrc);
+}
+
+boolean Boot_IsStayInBootloader(void)
+{
+    boolean result = FALSE;
+
+    if (TRUE == Boot_IsInfoValid())
+    {
+        if (gs_stBootInfo.stayInBootloader == *((uint8 *)gs_stBootInfo.stayInBootloaderAddr))
+        {
+            result = TRUE;
+        }
+    }
+
+    return result;
 }
 
 boolean Boot_IsPowerOnTriggerReset(void)
