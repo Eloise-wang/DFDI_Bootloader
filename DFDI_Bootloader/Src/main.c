@@ -89,17 +89,6 @@ static void BSP_CAN_RxCallback(const bsp_can_msg_t *msg)
 {
     if((NULL != msg) && (msg->dlc <= 8u))
     {
-        Debug_Printf("\n[UDS_INT] CAN->TP id=0x%03X len=%u data=%02X %02X %02X %02X %02X %02X %02X %02X\n",
-                     (unsigned int)msg->id,
-                     (unsigned int)msg->dlc,
-                     msg->data[0],
-                     msg->data[1],
-                     msg->data[2],
-                     msg->data[3],
-                     msg->data[4],
-                     msg->data[5],
-                     msg->data[6],
-                     msg->data[7]);
         (void)TP_DriverWriteDataInTP(msg->id, msg->dlc, msg->data);
     }
 }
@@ -112,18 +101,6 @@ static void BSP_SendMsgMainFun(void)
 {
     if(TRUE == TP_DriverReadDataFromTP(sizeof(gs_au8MsgBuf), &gs_au8MsgBuf[0u], &gs_u32MsgId, &gs_u32MsgLength))
     {
-        Debug_Printf("\n[UDS_INT] TP->CAN id=0x%03X len=%u data=%02X %02X %02X %02X %02X %02X %02X %02X\n",
-                     (unsigned int)gs_u32MsgId,
-                     (unsigned int)gs_u32MsgLength,
-                     gs_au8MsgBuf[0],
-                     gs_au8MsgBuf[1],
-                     gs_au8MsgBuf[2],
-                     gs_au8MsgBuf[3],
-                     gs_au8MsgBuf[4],
-                     gs_au8MsgBuf[5],
-                     gs_au8MsgBuf[6],
-                     gs_au8MsgBuf[7]);
-
         if(STATUS_SUCCESS == BSP_CAN_TransmitBlocking(gs_u32MsgId, (uint8_t)gs_u32MsgLength, gs_au8MsgBuf, 20U))
         {
             TP_DoTxMsgSuccesfulCallback();

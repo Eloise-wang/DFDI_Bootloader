@@ -13,6 +13,7 @@
 #include "bsp_flash.h"
 #include "device_status.h"
 #include "includes.h"
+#include "bsp_watchdog.h"
 
 /*******************************************************************************
  * 内部变量
@@ -142,6 +143,8 @@ static boolean BSP_Flash_Hal_EraseSector(const uint32_t startAddr, const uint32_
 static boolean BSP_Flash_Hal_ProgramData(const uint32_t startAddr, const uint8_t *pDataBuf, const uint32_t dataLen)
 {
     status_t status;
+    uint32_t offset = 0U;
+    const uint32_t chunkSize = (uint32_t)(PFLASH_WRITE_UNIT * 4U);
 
     if (!g_bFlashInit || (pDataBuf == NULL))
     {
@@ -154,11 +157,21 @@ static boolean BSP_Flash_Hal_ProgramData(const uint32_t startAddr, const uint8_t
         return FALSE;
     }
 
-    /* 编程Flash */
-    status = FLASH_DRV_Program(&g_flashConfig, startAddr, dataLen, pDataBuf);
-    if (status != STATUS_SUCCESS)
+    while (offset < dataLen)
     {
-        return FALSE;
+        uint32_t remaining = dataLen - offset;
+        uint32_t curLen = (remaining > chunkSize) ? chunkSize : remaining;
+
+        (void)BSP_WATCHDOG_Feed();
+        status = FLASH_DRV_Program(&g_flashConfig, startAddr + offset, curLen, &pDataBuf[offset]);
+        (void)BSP_WATCHDOG_Feed();
+
+        if (status != STATUS_SUCCESS)
+        {
+            return FALSE;
+        }
+
+        offset += curLen;
     }
 
     return TRUE;

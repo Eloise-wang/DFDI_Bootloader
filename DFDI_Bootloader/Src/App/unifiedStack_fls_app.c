@@ -974,26 +974,19 @@ void Flash_SaveDownloadDataInfo(const uint32 i_dataStartAddr, const uint32 i_dat
                     fillCnt);
 
         gs_stFlashDownloadInfo.receiveProgramDataLength += fillCnt;
-    
-        FLS_DebugPrintf("%s: last write addr=0x%08lX size=%lu(fill=%u)\n",
-                        __func__,
-                        (uint32)gs_stFlashDownloadInfo.startAddr,
-                        (uint32)(gs_stFlashDownloadInfo.receiveProgramDataLength - fillCnt),
-                        (uint32)fillCnt);
      
         /*write data in flash*/
         if(NULL_PTR != gs_stFlashDownloadInfo.stFlashOperateAPI.pfProgramData)
         {
-        
+            BSP_WATCHDOG_Feed();
+
             DisableAllInterrupts();
-            FLS_DebugPrintf("%s: write last chunk addr=0x%08lX size=%lu\n",
-                            __func__,
-                            (uint32)gs_stFlashDownloadInfo.startAddr,
-                            (uint32)gs_stFlashDownloadInfo.receiveProgramDataLength);
             result = gs_stFlashDownloadInfo.stFlashOperateAPI.pfProgramData(gs_stFlashDownloadInfo.startAddr,
                                                    &gs_stFlashDownloadInfo.aProgramDataBuff[flashDataIndex * PROGRAM_SIZE],
                                                    gs_stFlashDownloadInfo.receiveProgramDataLength);
-             EnableAllInterrupts();
+            EnableAllInterrupts();
+
+            BSP_WATCHDOG_Feed();
          }
          else
          {
