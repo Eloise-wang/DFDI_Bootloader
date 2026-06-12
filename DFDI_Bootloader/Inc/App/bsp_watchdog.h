@@ -30,9 +30,9 @@ extern "C" {
 #define WDG_INST 0U
 #endif
 
-/*!< 看门狗默认超时时间 (ms) - 约100ms后触发复位 */
+/*!< 看门狗默认超时时间 (ms) */
 #ifndef BSP_WDG_TIMEOUT_MS
-#define BSP_WDG_TIMEOUT_MS 1000U
+#define BSP_WDG_TIMEOUT_MS 5000U
 #endif
 
 /* ============================================  API  ============================================ */

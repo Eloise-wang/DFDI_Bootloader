@@ -16,6 +16,29 @@
  #include "boot.h"
  #include "bsp_watchdog.h"
  
+static bool gs_bUdsSuspendWatchdog = false;
+
+static void UDS_SuspendWatchdog(void)
+{
+    if (!gs_bUdsSuspendWatchdog)
+    {
+        (void)BSP_WATCHDOG_Deinit();
+        gs_bUdsSuspendWatchdog = true;
+    }
+}
+
+static void UDS_ResumeWatchdog(void)
+{
+    if (gs_bUdsSuspendWatchdog)
+    {
+        if (TRUE == BSP_WATCHDOG_Init())
+        {
+            (void)BSP_WATCHDOG_Feed();
+            gs_bUdsSuspendWatchdog = false;
+        }
+    }
+}
+
  typedef struct
  {
      uint32 startAddr;         /*data start address*/
@@ -426,6 +449,7 @@ static void UDS_DoCheckProgrammingDependencyRoutine(uint8 i_TxStatus);
      case 0x01u :  /*default mode*/
      case 0x81u :
          UDS_SetCurrentSession(DEFALUT_SESSION);
+        UDS_ResumeWatchdog();
  
          if(0x81u == requestSubfunction)
          {
@@ -437,6 +461,7 @@ static void UDS_DoCheckProgrammingDependencyRoutine(uint8 i_TxStatus);
      case 0x02u :  /*program mode*/
      case 0x82u :
          UDS_SetCurrentSession(PROGRAM_SESSION);
+        UDS_SuspendWatchdog();
  
          if(0x82u == requestSubfunction)
          {
