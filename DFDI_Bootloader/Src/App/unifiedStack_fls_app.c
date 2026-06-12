@@ -1441,7 +1441,8 @@ uint8 Flash_IsReadAppInfoFromFlashValid(void)
  uint8 Flash_WriteFlashAppInfo(void)
  {
      uint8 result = FALSE;
-     tAPPType oldAppType = APP_A_TYPE;
+    tAPPType oldAppType = APP_A_TYPE;
+    tAPPType targetAppType = APP_A_TYPE;
     uint32 appInfoStartAddr = 0u;
     uint32 appInfoLen = 0u;
     uint32 crc = 0u;
@@ -1451,18 +1452,30 @@ uint8 Flash_IsReadAppInfoFromFlashValid(void)
      uint32 newestAPPInfoStartAddr = 0u;
      uint32 newestAPPInfoLen = 0u;
      tAppFlashStatus *pstNewestAPPFlashStatus = NULL_PTR;
+    BlockInfo_t *pAppBlockInfo = NULL_PTR;
+    uint32 appBlockItemLen = 0u;
+    uint32 appCodeStartAddr = 0u;
      uint32 resetHandleAddr = 0u;
+    uint32 resetVector = 0xFFFFFFFFu;
  
      boolean bIsEnableWriteResetHandle = FALSE;
      uint32 resetHandleOffset = 0u;
      uint32 resetHandleLength = 0u;
  
+    enum { APPINFO_WRITE_LEN = (((uint32)sizeof(tAppFlashStatus) + (PFLASH_WRITE_UNIT - 1u)) & ~(PFLASH_WRITE_UNIT - 1u)) };
+    uint8 aAppInfoWriteBuf[APPINFO_WRITE_LEN];
+
      Flash_CreateAndSaveAppStatusCrc(&crc);
      
      oldAppType = Flash_GetOldAPPType();
+    targetAppType = Flash_GetTargetAPPType();
+    if(APP_INVLID_TYPE == targetAppType)
+    {
+        targetAppType = oldAppType;
+    }
      newestAPPType = Flash_GetNewestAPPType();
      
-     result = BSP_Flash_GetAPPInfo(oldAppType, &appInfoStartAddr, &appInfoLen);
+    result = BSP_Flash_GetAPPInfo(targetAppType, &appInfoStartAddr, &appInfoLen);
      if(TRUE == result)
      {
          /*write data information in flash*/
@@ -1484,12 +1497,20 @@ uint8 Flash_IsReadAppInfoFromFlashValid(void)
  #ifdef EN_APP_INFO_DATA_IN_NONE_FLASH
              resetHandleAddr = resetHandleOffset;
  #else
-             /*get app start address from flash. The address is the newest APP, because the APP info not write in flash, so the APP is old*/
-             resetHandleAddr = appInfoStartAddr + resetHandleOffset;
+            if((TRUE == BSP_Flash_GetConfigInfo(targetAppType, &pAppBlockInfo, &appBlockItemLen)) &&
+               (0u < appBlockItemLen))
+            {
+                appCodeStartAddr = pAppBlockInfo[0u].xBlockStartLogicalAddr;
+                resetHandleAddr = appCodeStartAddr + resetHandleOffset;
+            }
  #endif
-             Flash_SaveAppResetHandlerAddr(*((uint32*)resetHandleAddr), resetHandleLength);
+            if((TRUE == bIsEnableWriteResetHandle) && (0u != appCodeStartAddr))
+            {
+                resetVector = *((uint32*)resetHandleAddr);
+                Flash_SaveAppResetHandlerAddr(resetVector, resetHandleLength);
+            }
  
-             FLS_DebugPrintf("APP type =%X, APP address=0x%X\n", oldAppType, *((uint32*)resetHandleAddr));
+            FLS_DebugPrintf("APP type =%X, APP address=0x%X\n", targetAppType, resetVector);
  
              crc = 0u;
              Flash_CreateAndSaveAppStatusCrc(&crc);
@@ -1507,9 +1528,11 @@ uint8 Flash_IsReadAppInfoFromFlashValid(void)
  #else
              if(NULL_PTR != gs_stFlashDownloadInfo.stFlashOperateAPI.pfProgramData)
              {
-                 result = gs_stFlashDownloadInfo.stFlashOperateAPI.pfProgramData(appInfoStartAddr, 
-                                                     (uint8 *)pAppStatusPtr,
-                                                     sizeof(tAppFlashStatus));
+                fsl_memset(aAppInfoWriteBuf, 0xFFu, APPINFO_WRITE_LEN);
+                fsl_memcpy(aAppInfoWriteBuf, (const void *)pAppStatusPtr, sizeof(tAppFlashStatus));
+                result = gs_stFlashDownloadInfo.stFlashOperateAPI.pfProgramData(appInfoStartAddr, 
+                                                    aAppInfoWriteBuf,
+                                                    APPINFO_WRITE_LEN);
              }
  #endif			
          }

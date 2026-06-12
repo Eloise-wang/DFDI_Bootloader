@@ -228,6 +228,9 @@
  /*do erase flash*/
  static void UDS_DoEraseFlash(uint8 i_TxStatus);
  
+/*do check programming dependency routine*/
+static void UDS_DoCheckProgrammingDependencyRoutine(uint8 i_TxStatus);
+
  /*do check programming dependency*/
  static uint8 UDS_DoCheckProgrammingDependency(void);
  
@@ -814,7 +817,6 @@
  /*routine control*/
  static void UDS_RoutineControl(struct UDSServiceInfo* i_pstUDSServiceInfo, tUdsAppMsgInfo *m_pstPDUMsg)
  {
-     uint8 ret = FALSE;
      uint32 ReceivedCrc = 0u;
      uint8 aSWVersion[] = BOOTLOADER_SW_VERSION;
      uint8 aHWVersion[] = BOOTLOADER_HW_VERSION;
@@ -855,28 +857,8 @@
      /*Is check programming dependency?*/
      else if(TRUE == UDS_IsCheckProgrammingDependency(m_pstPDUMsg))
      {    
-         /*Fill response*/
-         m_pstPDUMsg->aDataBuf[0u] = i_pstUDSServiceInfo->serNum + 0x40u;
-         m_pstPDUMsg->xDataLen = 5u;
- 
-         /*write application information in flash.*/
-         ret = Flash_WriteFlashAppInfo();
-         if(TRUE == ret)
-         {
-             /*do check programming dependency*/
-             ret = UDS_DoCheckProgrammingDependency();
-         }
- 
-         if(TRUE == ret)
-         {
-             m_pstPDUMsg->aDataBuf[4u] = 0u;
-         }
-         else
-         {
-             m_pstPDUMsg->aDataBuf[4u] = 1u;
-         
-             UDS_DebugPrintf("%s: Write APP info or check dependency failed!\n", __func__);
-         }
+        UDS_SetNegativeErroCode(i_pstUDSServiceInfo->serNum, RCRRP, m_pstPDUMsg);
+        m_pstPDUMsg->pfUDSTxMsgServiceCallBack = &UDS_DoCheckProgrammingDependencyRoutine;
      }
  
      /*Is get version*/
@@ -1483,6 +1465,31 @@
      }
  }
  
+static void UDS_DoCheckProgrammingDependencyRoutine(uint8 TxStatus)
+{
+    uint8 ret = FALSE;
+    uint8 aResponseBuf[8u] = {0u};
+    tUdsId UdsTxId = 0u;
+
+    if(TX_MSG_SUCCESSFUL == TxStatus)
+    {
+        ret = Flash_WriteFlashAppInfo();
+        if(TRUE == ret)
+        {
+            ret = UDS_DoCheckProgrammingDependency();
+        }
+
+        aResponseBuf[0u] = gs_aCheckProgrammingDependencyId[0u] + 0x40u;
+        aResponseBuf[1u] = gs_aCheckProgrammingDependencyId[1u];
+        aResponseBuf[2u] = gs_aCheckProgrammingDependencyId[2u];
+        aResponseBuf[3u] = gs_aCheckProgrammingDependencyId[3u];
+        aResponseBuf[4u] = (TRUE == ret) ? 0u : 1u;
+
+        UdsTxId = TP_GetConfigTxMsgID();
+        (void)TP_WriteAFrameDataInTP(UdsTxId, NULL_PTR, 5u, aResponseBuf);
+    }
+}
+
  /*do check programming dependency*/
  static uint8 UDS_DoCheckProgrammingDependency(void)
  {
