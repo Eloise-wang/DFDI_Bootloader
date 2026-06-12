@@ -3,11 +3,11 @@
  *
  *  Created on: 2026年4月15日
  *      Author: Eloise
- *     Project: S32K142_CAN_Bootloader
- *       Brief: 【 】
- *       Note : 1. 适配芯片：S32K142_64
+ *     Project: DFDI_Bootloader
+ *       Brief: 【 DFDI Flash模块 - 统一接口实现】
+ *       Note : 1. 适配芯片：AC78406
  *              2. 编码格式：UTF-8
- *              3. 编译环境：S32DS 3.4 + GCC 7.2.1
+ *              3. 编译环境：Keil5 / MDK-ARM
  */
  #include "bsp_UDS_algorithm.h"
  #include "unifiedStack_uds_app_cfg.h"
@@ -687,13 +687,14 @@
          Ret = FALSE;
      }
  
-     if(TRUE == Ret)
-     {
-         /*set wait transfer data step(0x34 service)*/
-         Flash_SetNextDownloadStep(FL_TRANSFER_STEP);
- 
-         /*save received program addr and data len*/
-         Flash_SaveDownloadDataInfo(gs_stDowloadDataInfo.startAddr, gs_stDowloadDataInfo.dataLen);
+    if(TRUE == Ret)
+    {
+        UDS_DebugPrintf("%s: addr=0x%08lX len=%lu\n", __func__, (uint32)gs_stDowloadDataInfo.startAddr, (uint32)gs_stDowloadDataInfo.dataLen);
+        /*set wait transfer data step(0x34 service)*/
+        Flash_SetNextDownloadStep(FL_TRANSFER_STEP);
+
+        /*save received program addr and data len*/
+        Flash_SaveDownloadDataInfo(gs_stDowloadDataInfo.startAddr, gs_stDowloadDataInfo.dataLen);
  
          /*fill postive message*/
          m_pstPDUMsg->aDataBuf[0u] = i_pstUDSServiceInfo->serNum + 0x40u;
@@ -832,14 +833,18 @@
  
          m_pstPDUMsg->pfUDSTxMsgServiceCallBack = &UDS_DoEraseFlash;
      }
-     /*Is check sum routine control?*/
-     else if(TRUE == UDS_IsCheckSumRoutineControl(m_pstPDUMsg))
-     {
-         ReceivedCrc = m_pstPDUMsg->aDataBuf[4u];
-         ReceivedCrc = (ReceivedCrc << 8u) | m_pstPDUMsg->aDataBuf[5u];
-         ReceivedCrc = (ReceivedCrc << 8u) | m_pstPDUMsg->aDataBuf[6u];
-         ReceivedCrc = (ReceivedCrc << 8u) | m_pstPDUMsg->aDataBuf[7u];
-         Flash_SavedReceivedCheckSumCrc(ReceivedCrc);
+    /*Is check sum routine control?*/
+    else if(TRUE == UDS_IsCheckSumRoutineControl(m_pstPDUMsg))
+    {
+        ReceivedCrc = m_pstPDUMsg->aDataBuf[4u];
+        ReceivedCrc = (ReceivedCrc << 8u) | m_pstPDUMsg->aDataBuf[5u];
+        ReceivedCrc = (ReceivedCrc << 8u) | m_pstPDUMsg->aDataBuf[6u];
+        ReceivedCrc = (ReceivedCrc << 8u) | m_pstPDUMsg->aDataBuf[7u];
+        UDS_DebugPrintf("%s: receivedCRC=0x%04X (buf[4..7]=%02X %02X %02X %02X)\n",
+                        __func__, (uint32)ReceivedCrc,
+                        m_pstPDUMsg->aDataBuf[4u], m_pstPDUMsg->aDataBuf[5u],
+                        m_pstPDUMsg->aDataBuf[6u], m_pstPDUMsg->aDataBuf[7u]);
+        Flash_SavedReceivedCheckSumCrc(ReceivedCrc);
  
          /*request client timeout time*/
          UDS_SetNegativeErroCode(i_pstUDSServiceInfo->serNum, RCRRP, m_pstPDUMsg);

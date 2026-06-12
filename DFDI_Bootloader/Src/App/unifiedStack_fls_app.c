@@ -3,11 +3,11 @@
  *
  *  Created on: 2026年4月15日
  *      Author: Eloise
- *     Project: S32K142_CAN_Bootloader
- *       Brief: 【 】
- *       Note : 1. 适配芯片：S32K142_64
+ *     Project: DFDI_Bootloader
+ *       Brief: 【 DFDI Flash模块 - 统一接口实现】
+ *       Note : 1. 适配芯片：AC78406
  *              2. 编码格式：UTF-8
- *              3. 编译环境：S32DS 3.4 + GCC 7.2.1
+ *              3. 编译环境：Keil5 / MDK-ARM
  */
 
  #include "unifiedStack_fls_app.h"
@@ -471,17 +471,19 @@ do{\
      return result;
  }
  
- /*save download data information, the API called by UDS request download service*/
- void Flash_SaveDownloadDataInfo(const uint32 i_dataStartAddr, const uint32 i_dataLen)
- {
-     /*program data info*/
-     gs_stFlashDownloadInfo.startAddr = i_dataStartAddr;
-     gs_stFlashDownloadInfo.length = i_dataLen;
- 
-     /*calculate data CRC info*/
-     gs_stFlashDownloadInfo.receivedDataStartAddr = i_dataStartAddr;
-     gs_stFlashDownloadInfo.receivedDataLength = i_dataLen;
- }
+/*save download data information, the API called by UDS request download service*/
+void Flash_SaveDownloadDataInfo(const uint32 i_dataStartAddr, const uint32 i_dataLen)
+{
+    /*program data info*/
+    gs_stFlashDownloadInfo.startAddr = i_dataStartAddr;
+    gs_stFlashDownloadInfo.length = i_dataLen;
+
+    /*calculate data CRC info*/
+    gs_stFlashDownloadInfo.receivedDataStartAddr = i_dataStartAddr;
+    gs_stFlashDownloadInfo.receivedDataLength = i_dataLen;
+
+    FLS_DebugPrintf("%s: addr=0x%08lX len=%lu\n", __func__, (uint32)i_dataStartAddr, (uint32)i_dataLen);
+}
  
  /*set operate flash active job.*/
  void Flash_SetOperateFlashActiveJob(const tFlshJobModle i_activeJob, 
@@ -936,11 +938,13 @@ do{\
                  result = FALSE;
              }
              
-             if(TRUE == result)
-             {
-                 gs_stFlashDownloadInfo.length -= PROGRAM_SIZE;
-                 gs_stFlashDownloadInfo.receiveProgramDataLength -= PROGRAM_SIZE;
-                 gs_stFlashDownloadInfo.startAddr += PROGRAM_SIZE;
+            if(TRUE == result)
+            {
+                gs_stFlashDownloadInfo.length -= PROGRAM_SIZE;
+                gs_stFlashDownloadInfo.receiveProgramDataLength -= PROGRAM_SIZE;
+                FLS_DebugPrintf("%s: write chunk addr=0x%08lX size=%u\n",
+                                __func__, (uint32)gs_stFlashDownloadInfo.startAddr, (uint32)PROGRAM_SIZE);
+                gs_stFlashDownloadInfo.startAddr += PROGRAM_SIZE;
  
                  flashDataIndex++;
              }
@@ -959,24 +963,34 @@ do{\
          }
      }
  
-     /*calculate if program data is align < 8 bytes, need to fill 0xFF to align 8 bytes.*/
-     if((0u != gs_stFlashDownloadInfo.receiveProgramDataLength) && (TRUE == result))
-     {
-         fillCnt = (uint8)(gs_stFlashDownloadInfo.receiveProgramDataLength & 0x07u);
-         fillCnt = (~fillCnt + 1u) & 0x07u;
- 
-         fsl_memset((void *)&gs_stFlashDownloadInfo.aProgramDataBuff[flashDataIndex * PROGRAM_SIZE + gs_stFlashDownloadInfo.receiveProgramDataLength], 
-                     0xFFu, 
-                     fillCnt);
- 
-         gs_stFlashDownloadInfo.receiveProgramDataLength += fillCnt;
+    /*calculate if program data is align < 8 bytes, need to fill 0xFF to align 8 bytes.*/
+    if((0u != gs_stFlashDownloadInfo.receiveProgramDataLength) && (TRUE == result))
+    {
+        fillCnt = (uint8)(gs_stFlashDownloadInfo.receiveProgramDataLength & 0x07u);
+        fillCnt = (~fillCnt + 1u) & 0x07u;
+
+        fsl_memset((void *)&gs_stFlashDownloadInfo.aProgramDataBuff[flashDataIndex * PROGRAM_SIZE + gs_stFlashDownloadInfo.receiveProgramDataLength], 
+                    0xFFu, 
+                    fillCnt);
+
+        gs_stFlashDownloadInfo.receiveProgramDataLength += fillCnt;
+    
+        FLS_DebugPrintf("%s: last write addr=0x%08lX size=%lu(fill=%u)\n",
+                        __func__,
+                        (uint32)gs_stFlashDownloadInfo.startAddr,
+                        (uint32)(gs_stFlashDownloadInfo.receiveProgramDataLength - fillCnt),
+                        (uint32)fillCnt);
      
-         /*write data in flash*/
-         if(NULL_PTR != gs_stFlashDownloadInfo.stFlashOperateAPI.pfProgramData)
-         {
-         
-             DisableAllInterrupts();
-             result = gs_stFlashDownloadInfo.stFlashOperateAPI.pfProgramData(gs_stFlashDownloadInfo.startAddr, 
+        /*write data in flash*/
+        if(NULL_PTR != gs_stFlashDownloadInfo.stFlashOperateAPI.pfProgramData)
+        {
+        
+            DisableAllInterrupts();
+            FLS_DebugPrintf("%s: write last chunk addr=0x%08lX size=%lu\n",
+                            __func__,
+                            (uint32)gs_stFlashDownloadInfo.startAddr,
+                            (uint32)gs_stFlashDownloadInfo.receiveProgramDataLength);
+            result = gs_stFlashDownloadInfo.stFlashOperateAPI.pfProgramData(gs_stFlashDownloadInfo.startAddr,
                                                    &gs_stFlashDownloadInfo.aProgramDataBuff[flashDataIndex * PROGRAM_SIZE],
                                                    gs_stFlashDownloadInfo.receiveProgramDataLength);
              EnableAllInterrupts();
@@ -1131,13 +1145,17 @@ do{\
      checksumStep = Flash_GetChecksumStep();
      switch(checksumStep)
      {
-         case START_CHECKSUM:
-             
-             BSP_CRC_Start(&s_xCountCrc);
-             s_calCRCDataLen = 0u;
-             Flash_SetChecksumStep(DO_CHECKING_CHECKSUM);
- 
-             break;
+        case START_CHECKSUM:
+            
+            BSP_CRC_Start(&s_xCountCrc);
+            s_calCRCDataLen = 0u;
+            FLS_DebugPrintf("%s: START addr=0x%08lX len=%lu\n",
+                            __func__,
+                            (uint32)gs_stFlashDownloadInfo.receivedDataStartAddr,
+                            (uint32)gs_stFlashDownloadInfo.receivedDataLength);
+            Flash_SetChecksumStep(DO_CHECKING_CHECKSUM);
+
+            break;
  
          case DO_CHECKING_CHECKSUM:
  
@@ -1174,10 +1192,11 @@ do{\
  
              break;
  
-         case END_CHECKSUM:
-             
-             BSP_CRC_End(&s_xCountCrc);
-             Flash_SaveCalculateCRCValue(s_xCountCrc);
+        case END_CHECKSUM:
+            
+            BSP_CRC_End(&s_xCountCrc);
+            FLS_DebugPrintf("%s: END calcCRC=0x%04X\n", __func__, (uint32)s_xCountCrc);
+            Flash_SaveCalculateCRCValue(s_xCountCrc);
              isOperateFinsh = TRUE;
  
              Flash_SetChecksumStep(START_CHECKSUM);
@@ -1216,16 +1235,21 @@ void Flash_SavedReceivedCheckSumCrc(uint32 i_receivedCrc)
  static boolean Flash_IsReceivedCRCValid(void)
  {
      boolean res = FALSE;
- 
+
  #ifdef DebugBootloader_NOTCRC
      res = TRUE;
  #else
+     UDS_DebugPrintf("%s: receivedCRC=0x%04X calcCRC=0x%04X %s\n",
+                     __func__,
+                     (uint32)gs_stFlashDownloadInfo.receivedCRC,
+                     (uint32)gs_stFlashDownloadInfo.calculateCRCValue,
+                     (gs_stFlashDownloadInfo.receivedCRC == gs_stFlashDownloadInfo.calculateCRCValue) ? "MATCH" : "MISMATCH");
      if(gs_stFlashDownloadInfo.receivedCRC == gs_stFlashDownloadInfo.calculateCRCValue)
      {
          res = TRUE;
      }
  #endif
- 
+
      return res;
  }
  
