@@ -17,6 +17,8 @@
 #include "boot_cfg.h"
 
 #include "bsp_crc.h"
+#include "flash_drv.h"
+#include "ac7840x_features.h"
 
 /*******************************************************************************
  * Variables
@@ -40,6 +42,21 @@ static const tBootInfo gs_stBootInfo = {
 	0x20002FF0u,
 };
 
+typedef struct
+{
+	uint32 magic;
+	uint32 command;
+	uint32 reserved;
+	uint32 crc;
+} tBootFlashFlag;
+
+#define BOOT_FLASH_FLAG_SECTOR_ADDR  (0x0000F800u)
+#define BOOT_FLASH_FLAG_SECTOR_SIZE  (PFLASH_PAGE_SIZE)
+#define BOOT_FLASH_FLAG_MAGIC        (0x544F4F42u)  /* "BOOT" */
+#define BOOT_FLASH_FLAG_ENTER_CMD    (0x544E5245u)  /* "ERNT" */
+#define BOOT_FLASH_FLAG_RESERVED     (0xFFFFFFFFu)
+#define DFLASH_BASE_ADDR             (0x10000000UL)
+
 /*get information storage CRC*/
 #define GetInfoStorageCRC() (*(uint16 *)(gs_stBootInfo.infoStartAddr + 14))
 
@@ -51,6 +68,9 @@ static boolean Boot_IsInfoValid(void);
 
 /*calculate information CRC*/
 static uint32 Boot_CalculateInfoCRC(void);
+
+static uint32 Boot_CalculateFlashFlagCRC(const tBootFlashFlag *pFlag);
+static boolean Boot_WriteRequestEnterBootloaderFlashFlag(void);
 
 /*set download app successful */
 void SetDownloadAppSuccessful(void)
@@ -72,6 +92,8 @@ void Boot_RequestEnterBootloader(void)
 
 	infoCrc = Boot_CalculateInfoCRC();
 	SetInforCRC(infoCrc);
+
+	(void)Boot_WriteRequestEnterBootloaderFlashFlag();
 }
 
 /*Is download APP successful?*/
@@ -128,6 +150,52 @@ static uint32 Boot_CalculateInfoCRC(void)
 	BSP_CRC_CalculateOnce((const uint8 *)gs_stBootInfo.infoStartAddr, gs_stBootInfo.infoDataLen - 2u, &infoCrc);
 
 	return infoCrc;
+}
+
+static uint32 Boot_CalculateFlashFlagCRC(const tBootFlashFlag *pFlag)
+{
+	uint32 crc = 0u;
+
+	if(NULL_PTR != pFlag)
+	{
+		(void)BSP_CRC_CalculateOnce((const uint8 *)pFlag, sizeof(tBootFlashFlag) - sizeof(uint32), &crc);
+	}
+
+	return crc;
+}
+
+static boolean Boot_WriteRequestEnterBootloaderFlashFlag(void)
+{
+	flash_user_config_t userConfig;
+	flash_config_t flashConfig;
+	tBootFlashFlag flag = {
+		BOOT_FLASH_FLAG_MAGIC,
+		BOOT_FLASH_FLAG_ENTER_CMD,
+		BOOT_FLASH_FLAG_RESERVED,
+		0u
+	};
+
+	userConfig.pFlashBase = 0u;
+	userConfig.pFlashSize = PFLASH_BLOCK_SIZE;
+	userConfig.dFlashBase = DFLASH_BASE_ADDR;
+	userConfig.flexRAMBase = 0u;
+	userConfig.callback = NULL_PTR;
+
+	FLASH_DRV_Init(&userConfig, &flashConfig);
+
+	flag.crc = Boot_CalculateFlashFlagCRC(&flag);
+
+	if(STATUS_SUCCESS != FLASH_DRV_EraseSector(&flashConfig, BOOT_FLASH_FLAG_SECTOR_ADDR, BOOT_FLASH_FLAG_SECTOR_SIZE))
+	{
+		return FALSE;
+	}
+
+	if(STATUS_SUCCESS != FLASH_DRV_Program(&flashConfig, BOOT_FLASH_FLAG_SECTOR_ADDR, sizeof(tBootFlashFlag), (const uint8 *)&flag))
+	{
+		return FALSE;
+	}
+
+	return TRUE;
 }
 
 

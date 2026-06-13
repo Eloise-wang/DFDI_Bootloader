@@ -15,6 +15,7 @@
 #include "bsp_flash.h"
 #include "bsp_crc.h"
 #include "wdg_drv.h"
+#include "rcm_hw.h"
 
 typedef struct
 {
@@ -38,6 +39,19 @@ static const tBootInfo gs_stBootInfo = {
     0x20002FF0u,
     0x20002FF2u,
 };
+
+typedef struct
+{
+    uint32 magic;
+    uint32 command;
+    uint32 reserved;
+    uint32 crc;
+} tBootFlashFlag;
+
+#define BOOT_FLASH_FLAG_SECTOR_ADDR  (0x0000F800u)
+#define BOOT_FLASH_FLAG_SECTOR_SIZE  (PFLASH_PAGE_SIZE)
+#define BOOT_FLASH_FLAG_MAGIC        (0x544F4F42u)  /* "BOOT" */
+#define BOOT_FLASH_FLAG_ENTER_CMD    (0x544E5245u)  /* "ERNT" */
 
 #define GetInfoStorageCRC() (*(uint16 *)(gs_stBootInfo.infoStartAddr + 14u))
 #define SetInforCRC(xCrc) ((*(uint16 *)(gs_stBootInfo.infoStartAddr + 14u)) = (uint16)(xCrc))
@@ -75,6 +89,9 @@ static tAPPType Boot_GetAppTypeFromAddr(uint32 jumpAddr)
 
 static boolean Boot_IsInfoValid(void);
 static uint32 Boot_CalculateInfoCRC(void);
+static uint32 Boot_CalculateFlashFlagCRC(const tBootFlashFlag *pFlag);
+static boolean Boot_IsRequestEnterBootloaderFromFlash(void);
+static void Boot_ClearRequestEnterBootloaderFlashFlag(void);
 
 void Boot_SetDownloadAppSuccessful(void)
 {
@@ -90,6 +107,11 @@ void Boot_SetDownloadAppSuccessful(void)
 boolean Boot_IsRequestEnterBootloader(void)
 {
     boolean result = FALSE;
+
+    if (TRUE == Boot_IsRequestEnterBootloaderFromFlash())
+    {
+        return TRUE;
+    }
 
     if (TRUE == Boot_IsInfoValid())
     {
@@ -110,6 +132,8 @@ void Boot_ClearRequestEnterBootloaderFlag(void)
 
     infoCrc = Boot_CalculateInfoCRC();
     SetInforCRC(infoCrc);
+
+    Boot_ClearRequestEnterBootloaderFlashFlag();
 }
 
 void Boot_SetStayInBootloaderFlag(void)
@@ -149,6 +173,19 @@ boolean Boot_IsStayInBootloader(void)
 
 boolean Boot_IsPowerOnTriggerReset(void)
 {
+    uint32 resetStatus = RCM_GetResetStatus();
+
+    /* Clear transient RAM flags after power-on or external reset. */
+    if (0u != (resetStatus & CKGEN_RCM_STATUS_POR_RST_FLAG_Msk))
+    {
+        return TRUE;
+    }
+
+    if (0u != (resetStatus & CKGEN_RCM_STATUS_EXT_RST_FLAG_Msk))
+    {
+        return TRUE;
+    }
+
     return FALSE;
 }
 
@@ -240,4 +277,46 @@ static uint32 Boot_CalculateInfoCRC(void)
     (void)BSP_CRC_CalculateOnce((const uint8 *)gs_stBootInfo.infoStartAddr, gs_stBootInfo.infoDataLen - 2u, &infoCrc);
 
     return infoCrc;
+}
+
+static uint32 Boot_CalculateFlashFlagCRC(const tBootFlashFlag *pFlag)
+{
+    uint32 crc = 0u;
+
+    if (NULL_PTR != pFlag)
+    {
+        (void)BSP_CRC_CalculateOnce((const uint8 *)pFlag, sizeof(tBootFlashFlag) - sizeof(uint32), &crc);
+    }
+
+    return crc;
+}
+
+static boolean Boot_IsRequestEnterBootloaderFromFlash(void)
+{
+    const tBootFlashFlag *pFlashFlag = (const tBootFlashFlag *)BOOT_FLASH_FLAG_SECTOR_ADDR;
+    boolean result = FALSE;
+
+    if ((BOOT_FLASH_FLAG_MAGIC == pFlashFlag->magic) &&
+        (BOOT_FLASH_FLAG_ENTER_CMD == pFlashFlag->command) &&
+        (Boot_CalculateFlashFlagCRC(pFlashFlag) == pFlashFlag->crc))
+    {
+        result = TRUE;
+    }
+
+    return result;
+}
+
+static void Boot_ClearRequestEnterBootloaderFlashFlag(void)
+{
+    flash_user_config_t userConfig;
+    flash_config_t flashConfig;
+
+    userConfig.pFlashBase = PFLASH_BASE_ADDR;
+    userConfig.pFlashSize = PFLASH_BLOCK_SIZE;
+    userConfig.dFlashBase = DFLASH_BASE_ADDR;
+    userConfig.flexRAMBase = 0u;
+    userConfig.callback = NULL_PTR;
+
+    FLASH_DRV_Init(&userConfig, &flashConfig);
+    (void)FLASH_DRV_EraseSector(&flashConfig, BOOT_FLASH_FLAG_SECTOR_ADDR, BOOT_FLASH_FLAG_SECTOR_SIZE);
 }

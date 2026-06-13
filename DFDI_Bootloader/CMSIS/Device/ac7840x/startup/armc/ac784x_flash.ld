@@ -33,7 +33,8 @@ _Stack_Size = 0x800; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-  FLASH_BOOT (rx)  : ORIGIN = 0x00000000, LENGTH = 64K
+  FLASH_BOOT (rx)       : ORIGIN = 0x00000000, LENGTH = 0xF800
+  FLASH_BOOT_FLAG (rx)  : ORIGIN = 0x0000F800, LENGTH = 0x0800
   RAM  (xrw)       : ORIGIN = 0x1FFF8000, LENGTH = 128K
 }
 

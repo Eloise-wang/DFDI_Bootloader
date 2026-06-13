@@ -68,7 +68,7 @@ void APP_Demo_Init(void)
     Boot_CheckDownlaodAPPStatus();
     (void)BSP_WATCHDOG_Feed();
 
-    APP_DebugPrintf("\nWelcome enter AC7840 CAN(500K) APP demo!\n");
+    APP_DebugPrintf("\nWelcome enter AC7840 CAN(500K) APP demo!-----APPB  APPB\n");
 }
 
 /*FUNCTION**********************************************************************
