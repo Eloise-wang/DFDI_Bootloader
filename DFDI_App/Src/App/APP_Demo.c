@@ -19,6 +19,7 @@
 #include "bsp_watchdog.h"
 #include "bsp_can.h"
 #include "includes.h"
+#include "rcm_hw.h"
 
 /*******************************************************************************
  * User Include
@@ -52,8 +53,12 @@ static void APP_BSP_Init(void);
  *END**************************************************************************/
 void APP_Demo_Init(void)
 {
+    uint32_t resetSrs = RCM_GetResetStatus();
+
     APP_BSP_Init();
     (void)BSP_WATCHDOG_Feed();
+
+    APP_DebugPrintf("\nRCM_SRS=0x%08X\n", resetSrs);
 
     UDS_Init();
     (void)BSP_WATCHDOG_Feed();
